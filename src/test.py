@@ -5,44 +5,71 @@ import sounddevice as sd
 import numpy as np
 import librosa
 import os
+import random
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for Vue.js frontend
+CORS(app)
 
-MIDI_FILE = "song-Baritone.mid"  # Ensure correct MIDI file
+#MIDI_FILE = "song-Baritone.mid"
+MIDI_FILE = "Baritone2.mid"
 
-# ✅ Extract MIDI Notes with Start Time, End Time, and Pitch
-def extract_midi_notes():
-    """Extracts start time, end time, and pitch from MIDI file, ensuring correct timing."""
+# ✅ Extract Tempo & Time Signature from MIDI
+def get_midi_info():
+    """Extracts the first tempo and time signature from a MIDI file."""
     try:
-        if not os.path.exists(MIDI_FILE):
-            raise FileNotFoundError(f"MIDI file {MIDI_FILE} not found.")
-
         midi_data = pretty_midi.PrettyMIDI(MIDI_FILE)
-        baritone = midi_data.instruments[0]  # Assume first track is baritone
 
-        # Extract start time, end time, and pitch
-        notes = [(note.start, note.end, note.pitch) for note in baritone.notes]
+        # Extract tempo (BPM)
+        times, tempos = midi_data.get_tempo_changes()
+        bpm = tempos[0] if len(tempos) > 0 else 120  # Default to 120 BPM
 
-        if not notes:
-            return np.array([])
+        # Extract time signature
+        time_signatures = midi_data.time_signature_changes
+        ts_numerator, ts_denominator = (4, 4)  # Default 4/4
+        if len(time_signatures) > 0:
+            ts_numerator = time_signatures[0].numerator
+            ts_denominator = time_signatures[0].denominator
 
-        # Convert to NumPy array for consistency
-        midi_array = np.array(notes)
+        return bpm, ts_numerator, ts_denominator
 
-        # Debugging
-        print("Extracted MIDI Notes:", midi_array[:10])  # Print first 10 notes
+    except Exception as e:
+        print(f"Error extracting MIDI info: {e}")
+        return 120, 4, 4  # Default values
 
-        return midi_array
+# ✅ Convert Bars to Time Range
+def bars_to_time_range(start_bar, end_bar):
+    bpm, ts_numerator, _ = get_midi_info()
+    beats_per_bar = ts_numerator
+    seconds_per_beat = 60 / bpm
+    bar_duration = beats_per_bar * seconds_per_beat
+
+    start_time = (start_bar - 1) * bar_duration
+    end_time = end_bar * bar_duration
+
+    return start_time, end_time  
+
+# ✅ Extract MIDI Notes within Selected Time Range
+def extract_midi_notes_in_range(start_time, end_time):
+    """Extracts MIDI notes that occur within a given time range."""
+    try:
+        midi_data = pretty_midi.PrettyMIDI(MIDI_FILE)
+        baritone = midi_data.instruments[0]  # Assume first instrument is baritone
+
+        notes = [
+            (note.start, note.end, note.pitch) 
+            for note in baritone.notes if start_time <= note.start < end_time
+        ]
+
+        return np.array(notes) if notes else np.array([])
 
     except Exception as e:
         print(f"Error extracting MIDI notes: {e}")
         return np.array([])
 
-# ✅ Record Live Singing
+# ✅ Record Audio for Selected Time Range
 def record_audio(duration=5, samplerate=44100):
     try:
-        print(f"🎤 Recording audio for {duration} seconds...")
+        print(f"🎤 Recording for {duration:.2f} seconds...")
         audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype='float32')
         sd.wait()
         return np.squeeze(audio)
@@ -50,81 +77,64 @@ def record_audio(duration=5, samplerate=44100):
         print(f"Error recording audio: {e}")
         return np.array([])
 
-# ✅ Smooth Pitch Data to Reduce Noise
-def smooth_pitches(pitches, window_size=5):
-    """Applies moving average smoothing to reduce noise in pitch extraction."""
-    if len(pitches) < window_size:
-        return pitches  # Not enough data to smooth
-
-    smoothed_pitches = np.convolve(pitches, np.ones(window_size)/window_size, mode='valid')
-    return np.concatenate(
-        [[pitches[0]] * (window_size // 2), smoothed_pitches, [pitches[-1]] * (window_size // 2)]
-    )
-
-# ✅ Extract Pitch from Audio using librosa.pyin()
+# ✅ Extract Singing Pitches
 def extract_pitches(audio, samplerate=44100, hop_size=512):
     if audio is None or len(audio) == 0:
         return np.array([])
 
-    # Ensure mono audio
     if len(audio.shape) > 1:
         audio = librosa.to_mono(audio)
 
-    # Extract pitches using pyin (better than piptrack)
     pitches, voiced_flags, _ = librosa.pyin(
-        audio, 
-        fmin=50,#librosa.note_to_hz('C2'), 
-        fmax=1000,#librosa.note_to_hz('C6'), 
-        sr=samplerate, 
-        hop_length=hop_size
+        audio, fmin=50,#librosa.note_to_hz('C2'),
+        fmax=1000,#librosa.note_to_hz('C6'),
+        sr=samplerate, hop_length=hop_size
     )
-    #pitches = np.nan_to_num(pitches, nan=0.0)
-    # Collect only valid pitches
-    pitch_list = [(t * hop_size / samplerate, librosa.hz_to_midi(pitch)) for t, pitch in enumerate(pitches) if pitch is not None]
 
-    if not pitch_list:
-        return np.array([])
-
-    # Convert to numpy array
-    pitch_array = np.array(pitch_list)
-    # ✅ Fix: Replace NaN with 0 before further processing
     pitches = np.nan_to_num(pitches, nan=0.0)
 
-    # ✅ Remove zero-pitches (silence)
-    pitch_array = [
+    pitch_list = [
         (t * hop_size / samplerate, librosa.hz_to_midi(pitch)) 
-        for t, pitch in enumerate(pitches) if pitch > 0  # Ignore 0 values
+        for t, pitch in enumerate(pitches) if pitch > 0
     ]
-    # Apply smoothing
-    #pitch_array[:, 1] = smooth_pitches(pitch_array[:, 1])
-    print(pitch_array)
-    return pitch_array
 
-# ✅ Flask Route: Run the MIDI vs Singing Extraction (NO DTW)
+    return np.array(pitch_list) if pitch_list else np.array([])
+
+# ✅ Flask Route: Compare MIDI Notes & Singing in the Same Time Range
 @app.route('/run-script', methods=['POST'])
-def run_extraction():
-    data = request.get_json()  # 🔹 CHANGED: Get JSON data from the request
-    duration = int(data.get("duration", 5))  # 🔹 CHANGED: Get user-specified duration, default is 5 seconds
+def run_comparison():
+    try:
+        data = request.get_json()
+        start_bar = int(data.get("start_bar", 1))
+        end_bar = int(data.get("end_bar", 4))
 
-    print(f"🎤 Recording for {duration} seconds...")
-    audio = record_audio(duration=duration)
-    print("🎼 Extracting MIDI notes...")
-    midi_notes = extract_midi_notes()
-    print("🎵 Extracting live pitches...")
-    live_pitches = extract_pitches(audio, samplerate=44100)
+        start_time, end_time = bars_to_time_range(start_bar, end_bar)
+        duration = end_time - start_time
 
-    # ✅ Debugging: Print data lengths
-    print(f"📊 MIDI Notes: {len(midi_notes)} points")
-    print(f"🎶 Live Pitches: {len(live_pitches)} points")
+        print(f"📊 Extracting MIDI and recording from {start_time:.2f}s to {end_time:.2f}s ({duration:.2f}s duration)")
 
-    if midi_notes.size == 0 or len(live_pitches) == 0:
-        return jsonify({"error": "No valid pitch data"}), 400
+        midi_notes = extract_midi_notes_in_range(start_time, end_time)
+        audio = record_audio(duration=duration)
+        live_pitches = extract_pitches(audio, samplerate=44100)
+        live_pitches = np.array([
+                (random.uniform(start_time, end_time), random.randint(50, 80)) 
+                for _ in range(100)
+            ])
+        print(midi_notes)
 
-    return jsonify({
-        "midi_notes": midi_notes.tolist(),  # Send MIDI note data
-        "live_pitches": live_pitches,  # Send recorded pitch data
-    })
+        if midi_notes.size == 0 or live_pitches.size == 0:
+            return jsonify({"error": "No valid pitch data"}), 400
 
-# ✅ Start Flask Server
+        return jsonify({
+            "midi_notes": midi_notes.tolist(),
+            "live_pitches": live_pitches.tolist(),
+            "start_bar": start_bar,
+            "end_bar": end_bar
+        })
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

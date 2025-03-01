@@ -16,6 +16,15 @@ import {
 // ✅ Register required Chart.js components
 ChartJS.register(Title, Tooltip, Legend, LineController, LineElement, PointElement, LinearScale, CategoryScale);
 
+// ✅ Function to Convert MIDI Pitch to Note Name
+const midiToNote = (midi) => {
+  if (midi === null || midi < 0) return "";
+  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const octave = Math.floor(midi / 12) - 1;
+  const note = noteNames[midi % 12];
+  return `${note}${octave}`;
+};
+
 export default defineComponent({
   components: {
     LineChart,
@@ -41,6 +50,8 @@ export default defineComponent({
           backgroundColor: "red",
           pointRadius: 3,
           fill: false,
+          spanGaps: true, // ✅ Connect horizontal lines
+          stepped: "before", // ✅ Display MIDI as horizontal steps
         },
       ],
     });
@@ -53,7 +64,8 @@ export default defineComponent({
 
     const isLoading = ref(false);
     const errorMessage = ref("");
-    const duration = ref(5);  // 🔹 CHANGED: Default recording duration is now 5 seconds, user can modify
+    const startBar = ref(1);
+    const endBar = ref(1);
 
     // ✅ Fetch MIDI and singing pitch data
     const compareSinging = async () => {
@@ -61,17 +73,21 @@ export default defineComponent({
       errorMessage.value = "";
 
       try {
-        console.log(`🔄 Recording for ${duration.value} seconds...`);  // 🔹 CHANGED: Log user-defined duration
+        console.log(`🔄 Recording for bars ${startBar.value} to ${endBar.value}...`);
 
         const response = await fetch("http://127.0.0.1:5000/run-script", {
           method: "POST", 
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ duration: duration.value }), 
+          body: JSON.stringify({ start_bar: startBar.value, end_bar: endBar.value }), 
         });
         const data = await response.json();
 
         if (response.ok) {
           console.log("✅ Data received:", data);
+
+          if (!data.midi_notes || !data.live_pitches) {
+            throw new Error("Missing data in API response");
+          }
 
           const midiNotes = data.midi_notes.map((note) => ({
             start: note[0], 
@@ -81,33 +97,60 @@ export default defineComponent({
 
           const liveTimes = data.live_pitches.map((pitch) => pitch[0]);  // Live timestamps
           const livePitches = data.live_pitches.map((pitch) => pitch[1]);  // Live detected pitches
-          console.log(livePitches)
-          // Step 1: Create a common time axis
-          const minTime = Math.min(...midiNotes.map(n => n.start), ...liveTimes);
-          const maxTime = Math.max(...midiNotes.map(n => n.end), ...liveTimes);
           
-          const numPoints = 100;  // Increase for smoother chart
-          const timeStep = (maxTime - minTime) / numPoints;
-          const allTimes = Array.from({ length: numPoints }, (_, i) => minTime + i * timeStep);
+          // ✅ Step 1: Create a common time axis (Ensure correct min/max time)
+          const allTimes = [
+            ...midiNotes.map(n => n.start), 
+            ...midiNotes.map(n => n.end), 
+            ...liveTimes
+          ];
 
-          // Step 2: Extend MIDI notes over their duration
-          const midiMapped = allTimes.map((t) => {
+          if (allTimes.length === 0) {
+            throw new Error("No valid time data available");
+          }
+
+          const minTime = Math.min(...allTimes);
+          const maxTime = Math.max(...allTimes);
+          
+          let numPoints = 100;  // Increase for smoother chart
+          const numBars = endBar.value - startBar.value + 1;
+          while (numPoints % numBars != 0) {
+            numPoints += 1;
+          }
+          const timeStep = (maxTime - minTime) / numPoints;
+          const timeAxis = Array.from({ length: numPoints }, (_, i) => minTime + i * timeStep);
+
+          // ✅ Step 2: Extend MIDI notes over their duration
+          const midiMapped = timeAxis.map((t) => {
             const activeNote = midiNotes.find(note => note.start <= t && t <= note.end);
-            return activeNote ? activeNote.pitch : null;  // Keep note constant over duration
+            return activeNote ? activeNote.pitch : null;
           });
 
-          // Step 3: Align live singing data
-          const liveMapped = allTimes.map((t) => {
+          // ✅ Step 3: Align live singing data
+          const liveMapped = timeAxis.map((t) => {
             const closestIndex = liveTimes.findIndex((lt) => Math.abs(lt - t) < timeStep / 2);
             return closestIndex !== -1 ? livePitches[closestIndex] : null;
           });
 
-          console.log("Mapped Time Labels:", allTimes.slice(0, 10));
-          console.log("Mapped MIDI Pitches (Extended):", midiMapped.slice(0, 10));
-          console.log("Mapped Live Pitches:", liveMapped.slice(0, 10));
+          // ✅ Step 4: Remove empty/null datasets if all values are null
+          if (midiMapped.every(v => v === null)) {
+            console.warn("⚠️ MIDI data is empty after mapping.");
+          }
+          if (liveMapped.every(v => v === null)) {
+            console.warn("⚠️ Live pitch data is empty after mapping.");
+          }
 
-          // Step 4: Update chart data
-          chartData.value.labels = allTimes.map((t) => `${t.toFixed(2)}s`);
+          console.log("📊 Time Axis:", timeAxis);
+          console.log("🎼 Mapped MIDI Pitches:", midiMapped);
+          console.log("🎤 Mapped Live Pitches:", liveMapped);
+
+          // ✅ Step 5: Update chart data
+          const barStep = numBars / numPoints; // Distribute points across bars
+          const barAxis = Array.from({ length: numPoints }, (_, i) => startBar.value + i * barStep);
+          console.log(barAxis)
+          chartData.value.labels = barAxis.map((b, i) => (i % (numPoints/numBars) === 0 ? `Bar ${Math.round(b)}` : ""));
+
+          console.log(chartData.value.labels)
           chartData.value.datasets[0].data = midiMapped;
           chartData.value.datasets[1].data = liveMapped;
         } else {
@@ -122,16 +165,21 @@ export default defineComponent({
       }
     };
 
-    return { chartData, chartOptions, compareSinging, isLoading, errorMessage, duration };
+    return { chartData, chartOptions, compareSinging, isLoading, errorMessage, startBar, endBar };
   },
 });
 </script>
 
 <template>
   <div class="container">
-    <h2>Comparison Chart: MIDI vs Sung Notes</h2>
-    <label>🎤 Recording Duration (seconds):</label>  
-    <input type="number" v-model="duration" min="1" max="30" />  <!-- 🔹 CHANGED: Allow user to input duration -->
+    <h2>🎼 Compare MIDI & Singing in Same Bars</h2>
+
+    <label>Start Bar:</label>
+    <input type="number" v-model="startBar" min="1" />
+
+    <label>End Bar:</label>
+    <input type="number" v-model="endBar" min="1" />
+
     <button @click="compareSinging" :disabled="isLoading"> 🎤 Start Recording </button>
 
     <p v-if="isLoading">⏳ Recording... Please sing now!</p>
