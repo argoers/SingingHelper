@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 import os
-from midi_utils import get_midi_info, extract_midi_notes_in_range, bars_to_time_range
+from midi_utils import get_time_signature, extract_midi_notes_in_range, bars_to_time_range, get_tempo
 from audio_utils import record_audio, extract_pitches
 import numpy as np
 import random
@@ -78,3 +78,11 @@ def cancel_recording():
 
     is_recording = False
     return jsonify({"message": "Recording canceled"})
+
+@api_routes.get("/get-tempo")
+def get_midi_tempo():
+    try:
+        return {"tempo": get_tempo(MIDI_FILE)}
+    
+    except Exception as e:
+        return {"error": str(e)}

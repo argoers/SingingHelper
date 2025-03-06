@@ -83,9 +83,9 @@ export const compareSinging = async (startBar, endBar) => {
       return closestIndex !== -1 ? livePitches[closestIndex] : null;
     });
 
-    /*console.log("📊 Time Axis:", timeAxis);
+    /* console.log("📊 Time Axis:", timeAxis);
     console.log("🎼 Mapped MIDI Pitches:", midiMapped);
-    console.log("🎤 Mapped Live Pitches:", liveMapped);*/
+    console.log("🎤 Mapped Live Pitches:", liveMapped); */
 
     const barStep = numBars / numPoints;
     const barAxis = Array.from({ length: numPoints }, (_, i) => startBar + i * barStep);
@@ -101,7 +101,7 @@ export const compareSinging = async (startBar, endBar) => {
           pointRadius: 0,
           fill: false,
           stepped: "before",
-          spanGaps: true,
+          //spanGaps: true,
         },
         {
           label: "Sung Notes",
@@ -136,4 +136,12 @@ export const cancelRecording = async () => {
     console.error("❌ Failed to cancel recording:", error);
     return false;
   }
+};
+
+export const getTempo = async () => {
+  const response = await fetch(`${API_BASE_URL}/get-tempo`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch tempo.");
+  }
+  return await response.json();
 };

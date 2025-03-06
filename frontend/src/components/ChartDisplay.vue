@@ -53,10 +53,10 @@ export default {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "left" },
+        legend: { position: "top" },
         title: {
           display: true,
-          text: "Chart Title"
+          text: ""
         }
       },
       scales: {
@@ -66,9 +66,9 @@ export default {
             stepSize: 1,
             maxRotation: 0,    // ✅ Keep them horizontal
             minRotation: 0,
-            /*callback: function (value, index, values) {
-              return index % 10 === 0 ? value : "";  // ✅ Show only every 10th label
-            }*/
+            callback: function (value, index) {
+              return props.chartData.labels[index] ? props.chartData.labels[index] : null;
+            }
           },
         },
         y: {
@@ -76,7 +76,7 @@ export default {
           max: max,
           ticks: {
             autoSkip: false, // ✅ Show all Y ticks
-            stepSize: 2,
+            stepSize: 1,
             callback: function (value) {
               return midiToNote(value);
             }
