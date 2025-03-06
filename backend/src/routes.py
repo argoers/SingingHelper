@@ -10,6 +10,8 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 MIDI_FILE = None  # Stores the latest uploaded MIDI file path
+# ✅ Variable to track if recording is in progress
+is_recording = False
 
 api_routes = Blueprint("api_routes", __name__)
 
@@ -37,6 +39,8 @@ def upload_midi():
 @api_routes.route("/run-script", methods=["POST"])
 def run_comparison():
     global MIDI_FILE
+    global is_recording
+    is_recording=True
     if not MIDI_FILE:
         return jsonify({"error": "No MIDI file uploaded"}), 400
 
@@ -65,3 +69,12 @@ def run_comparison():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@api_routes.route("/cancel-recording", methods=["POST"])
+def cancel_recording():
+    global is_recording
+    if not is_recording:
+        return jsonify({"error": "No recording in progress"}), 400
+
+    is_recording = False
+    return jsonify({"message": "Recording canceled"})

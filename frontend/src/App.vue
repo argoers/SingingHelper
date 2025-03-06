@@ -18,11 +18,13 @@
     <button @click="startComparison" :disabled="isLoading || !fileUploaded">
       🎤 Start Recording
     </button>
+    <button @click="cancelRecordingProcess" v-if="isLoading">❌ Cancel Recording</button>
+
 
     <p v-if="isLoading">⏳ Processing... Please wait!</p>
     <p v-if="errorMessage" class="error">❌ {{ errorMessage }}</p>
 
-    <ChartDisplay v-if="chartData.labels.length" :chart-data="chartData" />
+    <ChartDisplay v-if="chartData.labels.length" :chart-data="chartData" :isRecordingCancelled="isRecordingCancelled" />
   </div>
 </template>
 
@@ -31,7 +33,7 @@ import { ref } from "vue";
 import FileUpload from "./components/FileUpload.vue";
 import BarSelection from "./components/BarSelection.vue";
 import ChartDisplay from "./components/ChartDisplay.vue";
-import { compareSinging } from "./services/api";
+import { compareSinging, cancelRecording } from "./services/api";
 
 export default {
   components: {
@@ -43,9 +45,12 @@ export default {
     const startBar = ref(1);
     const endBar = ref(1);
     const isLoading = ref(false);
+    const isRecordingCancelled = ref(false);
     const errorMessage = ref("");
     const fileUploaded = ref(false);
     const chartData = ref({ labels: [], datasets: [] });
+    const selectedFile = ref('');
+    let requestSession = 0; // ✅ Track current request session to prevent old updates
 
     const handleFileUploaded = (success) => {
       fileUploaded.value = success;
@@ -53,19 +58,37 @@ export default {
 
     const startComparison = async () => {
       isLoading.value = true;
+      isRecordingCancelled.value = false;
       errorMessage.value = "";
+  
+      const currentSession = ++requestSession;
+      console.log(currentSession);
 
       try {
         const data = await compareSinging(startBar.value, endBar.value);
-        chartData.value = data;
+        if (currentSession === requestSession && !isRecordingCancelled.value) {
+          chartData.value = data;
+        }
       } catch (error) {
         errorMessage.value = error.message;
       } finally {
-        isLoading.value = false;
+        if (currentSession === requestSession) {
+          isLoading.value = false;
+        }
       }
     };
 
-    return { startBar, endBar, isLoading, errorMessage, fileUploaded, chartData, handleFileUploaded, startComparison };
+    const cancelRecordingProcess = async () => {
+      const canceled = await cancelRecording();
+      if (canceled) {
+        isRecordingCancelled.value = true;
+        isLoading.value = false;
+        chartData.value = { labels: [], datasets: [] };
+        errorMessage.value = "Recording canceled!";
+      }
+    };
+
+    return { startBar, endBar, isLoading, errorMessage, fileUploaded, chartData, handleFileUploaded, startComparison, cancelRecordingProcess, selectedFile, isRecordingCancelled };
   },
 };
 </script>
@@ -73,7 +96,7 @@ export default {
 <style scoped>
 .container {
   text-align: center;
-  max-width: 800px;
+  max-width: 1400px;
   margin: auto;
 }
 

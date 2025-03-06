@@ -83,9 +83,9 @@ export const compareSinging = async (startBar, endBar) => {
       return closestIndex !== -1 ? livePitches[closestIndex] : null;
     });
 
-    console.log("📊 Time Axis:", timeAxis);
+    /*console.log("📊 Time Axis:", timeAxis);
     console.log("🎼 Mapped MIDI Pitches:", midiMapped);
-    console.log("🎤 Mapped Live Pitches:", liveMapped);
+    console.log("🎤 Mapped Live Pitches:", liveMapped);*/
 
     const barStep = numBars / numPoints;
     const barAxis = Array.from({ length: numPoints }, (_, i) => startBar + i * barStep);
@@ -117,5 +117,23 @@ export const compareSinging = async (startBar, endBar) => {
     };
   } catch (error) {
     throw new Error("Failed to compare singing: " + error.message);
+  }
+};
+
+// ✅ Add Cancel Recording Function
+export const cancelRecording = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/cancel-recording`, {
+      method: "POST",
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    console.log("❌ Recording canceled successfully.");
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to cancel recording:", error);
+    return false;
   }
 };
