@@ -34,20 +34,13 @@ export default {
 
     // ✅ Function to compute min & max from `chartData`
     const computeMinMaxPitch = () => {
-      if (!props.chartData || !props.chartData.datasets.length) return { min: 50, max: 80 }; // Default range
-
       const allPitches = props.chartData.datasets
         .flatMap(dataset => dataset.data)
         .filter(value => value !== null); // Remove null values
-
-      if (!allPitches.length) return { min: 50, max: 80 }; // If no valid data, use default
-
-      return {
-        min: Math.min(...allPitches) - 1, // ✅ Set min slightly lower for padding
-        max: Math.max(...allPitches) + 1, // ✅ Set max slightly higher for padding
-      };
+      if (!allPitches) return;
+      chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 1;
+      chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 1;
     };
-    const { min, max } = computeMinMaxPitch(); // ✅ Get dynamic Y-axis range
 
     const chartOptions = {
       responsive: true,
@@ -62,24 +55,19 @@ export default {
       scales: {
         x: {
           ticks: {
-            autoSkip: false,   // ✅ Show all bar labels
+            autoSkip: false,
             stepSize: 1,
-            maxRotation: 0,    // ✅ Keep them horizontal
-            minRotation: 0,
+            maxRotation: 0,
             callback: function (value, index) {
               return props.chartData.labels[index] ? props.chartData.labels[index] : null;
             }
           },
         },
         y: {
-          min: min,
-          max: max,
           ticks: {
-            autoSkip: false, // ✅ Show all Y ticks
+            autoSkip: false,
             stepSize: 1,
-            callback: function (value) {
-              return midiToNote(value);
-            }
+            callback: (value) => midiToNote(value)
           },
         },
       },
@@ -89,9 +77,9 @@ export default {
       if (chartInstance) {
         chartInstance.destroy(); // Destroy previous instance to prevent memory leaks
       }
-      
-      if (!props.chartData || !props.chartData.labels.length || props.isRecordingCancelled) return;
 
+      if (!props.chartData || !props.chartData.labels.length || props.isRecordingCancelled) return;
+      computeMinMaxPitch();
       chartInstance = new ChartJS(chartCanvas.value, {
         type: "line",
         data: props.chartData,
@@ -123,10 +111,11 @@ export default {
 <style scoped>
 .chart-container {
   width: 100%;
+  height: 100%;
 }
 
 canvas {
   width: 100%;
-  height: 400px;
+  height: 100%;
 }
 </style>

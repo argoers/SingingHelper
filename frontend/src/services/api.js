@@ -25,12 +25,98 @@ export const uploadFile = async (file) => {
   }
 };
 
-export const compareSinging = async (startBar, endBar) => {
+export const getMidiFileInfo = async (startBar, endBar) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/run-script`, {
+    const response = await fetch(`${API_BASE_URL}/get-midi-notes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ start_bar: startBar, end_bar: endBar }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error);
+
+    const midiNotes = data.midi_notes.map((note) => ({
+      start: note[0],
+      end: note[1],
+      pitch: note[2],
+    }));
+
+    let numPoints = 100;
+    const numBars = endBar - startBar + 1;
+    while (numPoints % numBars !== 0) {
+      numPoints += 1;
+    }
+
+    const startTime = data.start_time
+    const timeStep = data.duration / numPoints;
+    const timeAxis = Array.from({ length: numPoints }, (_, i) => startTime + i * timeStep);
+
+    const midiMapped = timeAxis.map((t) => {
+      const activeNote = midiNotes.find((note) => note.start <= t && t <= note.end);
+      return activeNote ? activeNote.pitch : null;
+    });
+
+    const barStep = numBars / numPoints;
+    const barAxis = Array.from({ length: numPoints }, (_, i) => startBar + i * barStep);
+    const labels = barAxis.map((b, i) => (i % (numPoints / numBars) === 0 ? `Bar ${Math.round(b)}` : ""));
+
+    return { labels: labels, midiNotes: midiMapped }
+  } catch (error) {
+    console.error("❌ Upload request failed:", error);
+    return false;
+  }
+};
+
+export const extractPitchesFromAudio = async (startBar, endBar) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/extract`);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error);
+    }
+
+    if (!data.live_pitches) {
+      throw new Error("Missing data in API response");
+    }
+
+    const liveTimes = data.live_pitches.map((pitch) => pitch[0]);
+    const livePitches = data.live_pitches.map((pitch) => pitch[1]);
+
+    if (liveTimes.length === 0) {
+      throw new Error("No valid singing data available");
+    }
+
+    let numPoints = livePitches.length;
+    const numBars = endBar - startBar + 1;
+
+    while (numPoints % numBars !== 0) {
+      numPoints += 1;
+    }
+    const duration = data.duration;
+    const timeStep = duration / numPoints;
+    const timeAxis = Array.from({ length: numPoints }, (_, i) => 0 + i * timeStep);
+    const liveMapped = timeAxis.map((t) => {
+      const closestIndex = liveTimes.findIndex((lt) => Math.abs(lt - t) < timeStep / 2);
+      return closestIndex !== -1 ? livePitches[closestIndex] : null;
+    });
+    //console.log(data.live_pitches, timeAxis, livePitches, liveTimes, liveMapped)
+    return { liveNotes: liveMapped };
+
+  } catch (error) {
+    throw new Error("Failed to compare singing: " + error.message);
+  }
+}
+
+export const recordAudio = async (startBar, endBar, tempo) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo }),
     });
 
     const data = await response.json();
@@ -39,82 +125,7 @@ export const compareSinging = async (startBar, endBar) => {
       throw new Error(data.error);
     }
 
-    if (!data.midi_notes || !data.live_pitches) {
-      throw new Error("Missing data in API response");
-    }
-
-    const midiNotes = data.midi_notes.map((note) => ({
-      start: note[0],
-      end: note[1],
-      pitch: note[2],
-    }));
-
-    const liveTimes = data.live_pitches.map((pitch) => pitch[0]);
-    const livePitches = data.live_pitches.map((pitch) => pitch[1]);
-
-    const allTimes = [
-      ...midiNotes.map((n) => n.start),
-      ...midiNotes.map((n) => n.end),
-      ...liveTimes,
-    ];
-
-    if (allTimes.length === 0) {
-      throw new Error("No valid time data available");
-    }
-
-    const minTime = Math.min(...allTimes);
-    const maxTime = Math.max(...allTimes);
-
-    let numPoints = 100;
-    const numBars = endBar - startBar + 1;
-    while (numPoints % numBars !== 0) {
-      numPoints += 1;
-    }
-    const timeStep = (maxTime - minTime) / numPoints;
-    const timeAxis = Array.from({ length: numPoints }, (_, i) => minTime + i * timeStep);
-
-    const midiMapped = timeAxis.map((t) => {
-      const activeNote = midiNotes.find((note) => note.start <= t && t <= note.end);
-      return activeNote ? activeNote.pitch : null;
-    });
-
-    const liveMapped = timeAxis.map((t) => {
-      const closestIndex = liveTimes.findIndex((lt) => Math.abs(lt - t) < timeStep / 2);
-      return closestIndex !== -1 ? livePitches[closestIndex] : null;
-    });
-
-    /* console.log("📊 Time Axis:", timeAxis);
-    console.log("🎼 Mapped MIDI Pitches:", midiMapped);
-    console.log("🎤 Mapped Live Pitches:", liveMapped); */
-
-    const barStep = numBars / numPoints;
-    const barAxis = Array.from({ length: numPoints }, (_, i) => startBar + i * barStep);
-
-    return {
-      labels: barAxis.map((b, i) => (i % (numPoints / numBars) === 0 ? `Bar ${Math.round(b)}` : "")),
-      datasets: [
-        {
-          label: "MIDI Notes",
-          data: midiMapped,
-          borderColor: "blue",
-          backgroundColor: "blue",
-          pointRadius: 0,
-          fill: false,
-          stepped: "before",
-          //spanGaps: true,
-        },
-        {
-          label: "Sung Notes",
-          data: liveMapped,
-          borderColor: "red",
-          backgroundColor: "red",
-          pointRadius: 3,
-          fill: false,
-          stepped: "before",
-          spanGaps: true,
-        },
-      ],
-    };
+    return true;
   } catch (error) {
     throw new Error("Failed to compare singing: " + error.message);
   }
@@ -142,6 +153,14 @@ export const getTempo = async () => {
   const response = await fetch(`${API_BASE_URL}/get-tempo`);
   if (!response.ok) {
     throw new Error("Failed to fetch tempo.");
+  }
+  return await response.json();
+};
+
+export const getBarTotal = async () => {
+  const response = await fetch(`${API_BASE_URL}/get-bar-total`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch bar range.");
   }
   return await response.json();
 };

@@ -1,7 +1,7 @@
 <template>
   <div class="file-upload">
     <input type="file" ref="fileInput" @change="handleFileUpload" hidden />
-    <button @click="openFileDialog">📂 Upload MIDI File</button>
+    <button :disabled="isLoading || countdown > 0" @click="openFileDialog">📂 Upload MIDI File</button>
     <p v-if="selectedFile">Selected file: {{ selectedFile.name }}</p>
   </div>
 </template>
@@ -11,8 +11,12 @@ import { ref } from "vue";
 import { uploadFile } from "../services/api";
 
 export default {
+  props: {
+    isLoading: Boolean,
+    countdown: Number
+  },
   emits: ["file-uploaded"],
-  setup(_, { emit }) {
+  setup(props, { emit }) {
     const selectedFile = ref(null);
     const fileInput = ref(null);
 
@@ -21,11 +25,17 @@ export default {
     };
 
     const handleFileUpload = async (event) => {
-      selectedFile.value = event.target.files[0];
+      const file = event.target.files[0]
+      if (!file) return;
 
-      if (!selectedFile.value) return;
+      const success = await uploadFile(file);
 
-      const success = await uploadFile(selectedFile.value);
+      if (!success) {
+        selectedFile.value = null;
+      } else {
+        selectedFile.value = file;
+      }
+
       emit("file-uploaded", success);
     };
 
@@ -41,5 +51,10 @@ export default {
   padding: 10px 15px;
   cursor: pointer;
   border-radius: 5px;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 </style>

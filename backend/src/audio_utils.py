@@ -27,7 +27,7 @@ def extract_pitches(audio, samplerate=44100, hop_size=512):
     )
 
     pitches = np.nan_to_num(pitches, nan=0.0)
-
+    pitches = pitches[12:]
     pitch_list = [
         (t * hop_size / samplerate, librosa.hz_to_midi(pitch))
         for t, pitch in enumerate(pitches) if pitch > 0

@@ -3,26 +3,31 @@
     <h2>🎼 Compare MIDI & Singing</h2>
 
     <div class="upload-section">
-      <FileUpload @file-uploaded="handleFileUploaded" />
-      <p v-if="selectedFile">📂 Selected file: <strong>{{ selectedFile }}</strong></p>
+      <FileUpload @file-uploaded="handleFileUploaded" :isLoading="isLoading" :countdown="countdown" />
+      <p v-if="selectedFile">📂 Selected file: <b>{{ selectedFile }}</b></p>
     </div>
 
-    <div class="bar-selection">
+    <div v-if="fileUploaded" class="bar-selection">
       <label>Start Bar:</label>
-      <input type="number" v-model="startBar" min="1" />
+      <input type="number" v-model="startBar" />
 
       <label>End Bar:</label>
-      <input type="number" v-model="endBar" min="1" />
+      <input type="number" v-model="endBar" />
+
+      <div v-if="tempo !== null">
+        <label>Tempo:</label>
+        <input type="number" v-model="tempo" />
+      </div>
     </div>
 
-    <button @click="startComparison" :disabled="countdown > 0" v-if="!isLoading && fileUploaded">
+    <button @click="startRecordingAudio" :disabled="countdown > 0" v-if="!isLoading && fileUploaded">
       🎤 {{ countdown > 0 ? `Starting in ${countdown}...` : "Start Recording" }}
     </button>
     <button @click="cancelRecordingProcess" v-if="isLoading">❌ Cancel Recording</button>
     <button @click="playFirstNote" v-if="!isLoading && fileUploaded && countdown == 0">Play First Note</button>
 
 
-    <p v-if="isLoading">🎤 Sing now!</p>
+    <p v-if="isLoading">{{ loadingMessage }}</p>
     <p v-if="errorMessage" class="error">❌ {{ errorMessage }}</p>
 
     <ChartDisplay v-if="chartData.labels.length" :chart-data="chartData" :isRecordingCancelled="isRecordingCancelled" />
@@ -30,11 +35,11 @@
 </template>
 
 <script>
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import FileUpload from "./components/FileUpload.vue";
 import BarSelection from "./components/BarSelection.vue";
 import ChartDisplay from "./components/ChartDisplay.vue";
-import { compareSinging, cancelRecording, getTempo } from "./services/api";
+import { recordAudio, cancelRecording, getTempo, getMidiFileInfo, extractPitchesFromAudio, getBarTotal } from "./services/api";
 import metronomeSound from "@/assets/metronome.mp3";
 
 export default {
@@ -44,41 +49,106 @@ export default {
     ChartDisplay,
   },
   setup() {
+    const loadingMessage = ref('🎤 Sing now!');
     const startBar = ref(1);
     const endBar = ref(1);
     const isLoading = ref(false);
     const isRecordingCancelled = ref(false);
     const errorMessage = ref("");
     const fileUploaded = ref(false);
-    const chartData = ref({ labels: [], datasets: [] });
+    const chartData = ref({
+      labels: [], datasets: [
+        {
+          label: "MIDI Notes",
+          borderColor: "blue",
+          backgroundColor: "blue",
+          pointRadius: 0,
+          fill: false,
+          stepped: "before",
+          //spanGaps: true,
+        },
+        {
+          label: "Sung Notes",
+          borderColor: "red",
+          backgroundColor: "red",
+          pointRadius: 3,
+          fill: false,
+          stepped: "before",
+          spanGaps: true,
+        }
+      ]
+    });
     const selectedFile = ref('');
     const countdown = ref(0);
-    const tempo = ref(60); // Default tempo (BPM)
+    const tempo = ref(null); // Default tempo (BPM)
+    const totalBars = ref(null);
+    const defaultTempo = ref(null);
 
     let requestSession = 0; // ✅ Track current request session to prevent old updates
     let metronomeInterval = null;
     let metronomeAudio = new Audio(metronomeSound); // ✅ Load metronome sound
     metronomeAudio.load();
 
+    const resetData = () => {
+      chartData.value.labels = {};
+      chartData.value.datasets[0].data = {};
+      chartData.value.datasets[1].data = null;
+    }
+
     const handleFileUploaded = async (success) => {
       fileUploaded.value = success;
+      if (!success) {
+        errorMessage.value = "Select a MIDI file!";
+        resetData();
+        return;
+      } else {
+        errorMessage.value = "";
+      }
+
       try {
         const response = await getTempo(); // ✅ Fetch tempo from backend
-        tempo.value = response.tempo || 120; // ✅ Update tempo, fallback to 120 BPM
+        tempo.value = Math.round(response.tempo)
+        defaultTempo.value = Math.round(response.tempo);
       } catch (error) {
         errorMessage.value = "Failed to fetch tempo.";
       }
+
+      try {
+        const response = await getBarTotal(); // ✅ Fetch tempo from backend
+        endBar.value = response.bar_total
+        totalBars.value = response.bar_total
+      } catch (error) {
+        errorMessage.value = "Failed to fetch bars.";
+      }
+
+
+      try {
+        const response = await getMidiFileInfo(startBar.value, endBar.value); // ✅ Fetch tempo from backend
+        chartData.value.datasets[0].data = response.midiNotes;
+        chartData.value.labels = response.labels;
+      } catch (error) {
+        errorMessage.value = "Failed to fetch MIDI notes.";
+      }
     };
 
-    const playClickSound = () => {
+    const playClickSound = (loud) => {
+      const firstBeatVolume = loud ? 1 : 0.1
+      const allBeatVolumeCoef = countdown.value > 1 ? 1 : 0.1
       metronomeAudio.currentTime = 0;
+      metronomeAudio.volume = firstBeatVolume * allBeatVolumeCoef;
       metronomeAudio.play();
     };
 
-    const playMetronome = () => {
+    const playMetronome = (loud) => {
       stopMetronome();
+      playClickSound(loud);
+      const beatsPerBar = 4
+      let beatCount = 0;
       const interval = (60 / tempo.value) * 1000; // ✅ Convert BPM to milliseconds
-      metronomeInterval = setInterval(playClickSound, interval); // Adjust for tempo
+      metronomeInterval = setInterval(() => {
+        beatCount = (beatCount + 1) % beatsPerBar;
+        playClickSound(beatCount === 0); // Strong beat on 1, weaker on others
+      }, interval);
     };
 
     const stopMetronome = () => {
@@ -93,47 +163,56 @@ export default {
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
 
-      oscillator.frequency.setValueAtTime(chartData.value.datasets[0].data[0], audioCtx.currentTime);
+      const firstNoteFrequency = chartData.value.datasets[0].data.filter(value => value)[0];
+      oscillator.frequency.setValueAtTime(firstNoteFrequency * 4, audioCtx.currentTime);
       gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
       //gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
 
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 2); // Stop after 100ms */
     }
 
-    const startComparison = async () => {
+    const startRecordingAudio = async () => {
 
       isRecordingCancelled.value = false;
       errorMessage.value = "";
-
-      countdown.value = 3; // ✅ Start countdown from 3
-      playMetronome();
-
+      const currentSession = ++requestSession;
+      countdown.value = 8; // ✅ Start countdown from 3
+      playMetronome(true);
+      chartData.value.datasets[1].data = null;
       // ✅ Wait for countdown to finish
       while (countdown.value > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 sec
+        await new Promise(resolve => setTimeout(resolve, (60 / tempo.value) * 1000)); // Wait 1 sec
         countdown.value--;
       }
-      isLoading.value = true;
-      const currentSession = ++requestSession;
 
+      isLoading.value = true;
 
       try {
-        const data = await compareSinging(startBar.value, endBar.value);
+        await recordAudio(startBar.value, endBar.value, tempo.value);
+      } catch (error) {
+        errorMessage.value = error.message;
+      }
+
+      stopMetronome();
+      loadingMessage.value = "Processing audio"
+
+      try {
+        const data = await extractPitchesFromAudio(startBar.value, endBar.value);
         if (currentSession === requestSession && !isRecordingCancelled.value) {
-          chartData.value = data;
+          chartData.value.datasets[1].data = data.liveNotes;
         }
       } catch (error) {
         errorMessage.value = error.message;
-      } finally {
-        if (currentSession === requestSession) {
-          stopMetronome();
-          isLoading.value = false;
-        }
       }
+
+      if (currentSession === requestSession) {
+        isLoading.value = false;
+      }
+
+      loadingMessage.value = '🎤 Sing now!'
     };
 
     const cancelRecordingProcess = async () => {
@@ -142,12 +221,44 @@ export default {
       if (canceled) {
         isRecordingCancelled.value = true;
         isLoading.value = false;
-        chartData.value = { labels: [], datasets: [] };
         errorMessage.value = "Recording canceled!";
       }
     };
 
-    return { startBar, endBar, isLoading, errorMessage, fileUploaded, chartData, handleFileUploaded, startComparison, cancelRecordingProcess, selectedFile, isRecordingCancelled, countdown, playFirstNote };
+    watch([startBar, endBar], async () => {
+      if (startBar.value && endBar.value || endBar.value === 0 || startBar.value === 0) {
+        if (endBar.value > totalBars.value) {
+          endBar.value = totalBars.value
+        } else if (endBar.value < startBar.value) {
+          if (endBar.value === totalBars.value) {
+            startBar.value = endBar.value
+          } else {
+            endBar.value = startBar.value
+          }
+        } else if (startBar.value <= 0) {
+          startBar.value = 1
+        } else {
+          try {
+            const response = await getMidiFileInfo(startBar.value, endBar.value); // ✅ Fetch tempo from backend
+            chartData.value.datasets[0].data = response.midiNotes;
+            chartData.value.datasets[1].data = null;
+            chartData.value.labels = response.labels;
+          } catch (error) {
+            errorMessage.value = "Failed to fetch tempo.";
+          }
+        }
+      }
+    });
+
+    watch(tempo, async () => {
+      if (tempo.value && tempo.value < 0 || tempo.value === 0) {
+        tempo.value = defaultTempo.value
+      }
+    });
+
+
+
+    return { loadingMessage, startBar, endBar, isLoading, errorMessage, fileUploaded, chartData, handleFileUploaded, startRecordingAudio, cancelRecordingProcess, selectedFile, isRecordingCancelled, countdown, playFirstNote, tempo };
   },
 };
 </script>

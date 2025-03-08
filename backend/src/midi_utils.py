@@ -1,10 +1,10 @@
 import pretty_midi
 import numpy as np
+from math import ceil
 
 def get_tempo(midi_file):
     try:
         pm = pretty_midi.PrettyMIDI(midi_file)
-        print(pm.get_tempo_changes()[1])
         tempo_changes = pm.get_tempo_changes()
         if len(tempo_changes[1]) > 0:
             tempo = tempo_changes[1][0]  # Get first detected tempo
@@ -14,7 +14,20 @@ def get_tempo(midi_file):
     except Exception as e:
         print(f"Error extracting MIDI tempo: {e}")
         return 120
-
+    
+def get_bar_total(midi_file):
+    try:
+        pm = pretty_midi.PrettyMIDI(midi_file)
+        beats, denominator = get_time_signature(midi_file)
+        total_beats = len(pm.get_beats())
+        beats_per_bar = beats / (denominator / 4)
+        total_bars = total_beats / beats_per_bar
+        
+        return ceil(total_bars)
+    
+    except Exception as e:
+        print(f"Error extracting MIDI bars: {e}")
+        return 4
 
 # ✅ Extract Tempo & Time Signature
 def get_time_signature(midi_file):
@@ -42,7 +55,7 @@ def bars_to_time_range(midi_file, start_bar, end_bar):
     start_time = (start_bar - 1) * bar_duration
     end_time = end_bar * bar_duration
 
-    return start_time, end_time  
+    return start_time, end_time, bpm  
 
 
 # ✅ Extract MIDI Notes within Selected Time Range
