@@ -41,13 +41,14 @@ def get_time_signature(midi_file):
 
     except Exception as e:
         print(f"Error extracting MIDI time signature: {e}")
-        return 120, 4, 4
+        return 4, 4
 
 
 # ✅ Convert Bars to Time Range
 def bars_to_time_range(midi_file, start_bar, end_bar):
-    ts_numerator, _ = get_time_signature(midi_file)
+    ts_numerator, ts_denominator = get_time_signature(midi_file)
     bpm = get_tempo(midi_file)
+    bpm *= ts_denominator / 4
     beats_per_bar = ts_numerator
     seconds_per_beat = 60 / bpm
     bar_duration = beats_per_bar * seconds_per_beat

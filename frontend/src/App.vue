@@ -3,7 +3,8 @@
     <h2>🎼 Compare MIDI & Singing</h2>
 
     <div class="upload-section">
-      <FileUpload @file-uploaded="handleFileUploaded" :isLoading="isLoading" :countdown="countdown" />
+      <FileUpload @file-uploaded="handleFileUploaded"
+        :isRecordingProcessActive="isInCountdown || isRecording || isProcessingAudio" />
       <p v-if="selectedFile">📂 Selected file: <b>{{ selectedFile }}</b></p>
     </div>
 
@@ -20,17 +21,21 @@
       </div>
     </div>
 
-    <button @click="startRecordingAudio" :disabled="countdown > 0" v-if="!isLoading && fileUploaded">
+    <button @click="startRecordingAudio" :disabled="isInCountdown"
+      v-if="!isRecording && !isProcessingAudio && fileUploaded">
       🎤 {{ countdown > 0 ? `Starting in ${countdown}...` : "Start Recording" }}
     </button>
-    <button @click="cancelRecordingProcess" v-if="isLoading">❌ Cancel Recording</button>
-    <button @click="playFirstNote" v-if="!isLoading && fileUploaded && countdown == 0">Play First Note</button>
+    <button @click="cancelRecordingProcess" v-if="isRecording">❌ Cancel Recording</button>
+    <button @click="playFirstNote" v-if="!isRecording && !isInCountdown && !isProcessingAudio && fileUploaded">Play
+      First Note</button>
 
-
-    <p v-if="isLoading">{{ loadingMessage }}</p>
+    <p v-if="isRecording">{{ loadingRecordingMessage }}</p>
+    <p v-if="isProcessingAudio">{{ loadingProcessingMessage }}</p>
     <p v-if="errorMessage" class="error">❌ {{ errorMessage }}</p>
-
+    <NoteVisualization v-if="midiNotes" :midiNotes="midiNotes" :isRecording="isRecording" :tempo="tempo"
+      :startBar="startBar" :endBar="endBar" />
     <ChartDisplay v-if="chartData.labels.length" :chart-data="chartData" :isRecordingCancelled="isRecordingCancelled" />
+
   </div>
 </template>
 
@@ -39,20 +44,25 @@ import { ref, watch } from "vue";
 import FileUpload from "./components/FileUpload.vue";
 import BarSelection from "./components/BarSelection.vue";
 import ChartDisplay from "./components/ChartDisplay.vue";
-import { recordAudio, cancelRecording, getTempo, getMidiFileInfo, extractPitchesFromAudio, getBarTotal } from "./services/api";
+import { recordAudio, getTempo, getMidiFileInfo, extractPitchesFromAudio, getBarTotal, getTimeSignature } from "./services/api";
 import metronomeSound from "@/assets/metronome.mp3";
+import NoteVisualization from "./components/NoteVisualization.vue";
 
 export default {
   components: {
     FileUpload,
     BarSelection,
     ChartDisplay,
+    NoteVisualization
   },
   setup() {
-    const loadingMessage = ref('🎤 Sing now!');
+    const loadingRecordingMessage = ref('🎤 Sing now!');
+    const loadingProcessingMessage = ref("Processing audio");
     const startBar = ref(1);
     const endBar = ref(1);
-    const isLoading = ref(false);
+    const isInCountdown = ref(false);
+    const isRecording = ref(false);
+    const isProcessingAudio = ref(false);
     const isRecordingCancelled = ref(false);
     const errorMessage = ref("");
     const fileUploaded = ref(false);
@@ -83,6 +93,8 @@ export default {
     const tempo = ref(null); // Default tempo (BPM)
     const totalBars = ref(null);
     const defaultTempo = ref(null);
+    const midiNotes = ref(null);
+    const timeSignature = ref(null);
 
     let requestSession = 0; // ✅ Track current request session to prevent old updates
     let metronomeInterval = null;
@@ -106,9 +118,17 @@ export default {
       }
 
       try {
+        const response = await getTimeSignature(); // ✅ Fetch tempo from backend
+        timeSignature.value = [response.numerator, response.denominator];
+      } catch (error) {
+        errorMessage.value = "Failed to fetch MIDI notes.";
+      }
+
+      try {
         const response = await getTempo(); // ✅ Fetch tempo from backend
-        tempo.value = Math.round(response.tempo)
-        defaultTempo.value = Math.round(response.tempo);
+        let correctTempo = timeSignature.value[1] / 4 * response.tempo
+        tempo.value = correctTempo
+        defaultTempo.value = correctTempo;
       } catch (error) {
         errorMessage.value = "Failed to fetch tempo.";
       }
@@ -124,8 +144,9 @@ export default {
 
       try {
         const response = await getMidiFileInfo(startBar.value, endBar.value); // ✅ Fetch tempo from backend
-        chartData.value.datasets[0].data = response.midiNotes;
+        chartData.value.datasets[0].data = response.midiNotesPoints;
         chartData.value.labels = response.labels;
+        midiNotes.value = response.midiNotes;
       } catch (error) {
         errorMessage.value = "Failed to fetch MIDI notes.";
       }
@@ -142,7 +163,7 @@ export default {
     const playMetronome = (loud) => {
       stopMetronome();
       playClickSound(loud);
-      const beatsPerBar = 4
+      const beatsPerBar = timeSignature.value[0]
       let beatCount = 0;
       const interval = (60 / tempo.value) * 1000; // ✅ Convert BPM to milliseconds
       metronomeInterval = setInterval(() => {
@@ -175,29 +196,35 @@ export default {
     }
 
     const startRecordingAudio = async () => {
+      const currentSession = ++requestSession;
 
       isRecordingCancelled.value = false;
       errorMessage.value = "";
-      const currentSession = ++requestSession;
-      countdown.value = 8; // ✅ Start countdown from 3
+
+      isInCountdown.value = true;
+      countdown.value = timeSignature.value[0] * 2; // ✅ Start countdown from 3
+
       playMetronome(true);
-      chartData.value.datasets[1].data = null;
-      // ✅ Wait for countdown to finish
+      
       while (countdown.value > 0) {
         await new Promise(resolve => setTimeout(resolve, (60 / tempo.value) * 1000)); // Wait 1 sec
         countdown.value--;
       }
 
-      isLoading.value = true;
+      isInCountdown.value = false;
+      isRecording.value = true;
 
       try {
         await recordAudio(startBar.value, endBar.value, tempo.value);
       } catch (error) {
         errorMessage.value = error.message;
       }
-
+      if (currentSession !== requestSession || isRecordingCancelled.value) return;
+      
+      isRecording.value = false;
       stopMetronome();
-      loadingMessage.value = "Processing audio"
+
+      isProcessingAudio.value = true;
 
       try {
         const data = await extractPitchesFromAudio(startBar.value, endBar.value);
@@ -209,20 +236,17 @@ export default {
       }
 
       if (currentSession === requestSession) {
-        isLoading.value = false;
+        isProcessingAudio.value = false;
       }
-
-      loadingMessage.value = '🎤 Sing now!'
     };
 
     const cancelRecordingProcess = async () => {
       stopMetronome();
-      const canceled = await cancelRecording();
-      if (canceled) {
-        isRecordingCancelled.value = true;
-        isLoading.value = false;
-        errorMessage.value = "Recording canceled!";
-      }
+      
+      isRecordingCancelled.value = true;
+      isRecording.value = false;
+      isProcessingAudio.value = false;
+      errorMessage.value = "Recording canceled!";
     };
 
     watch([startBar, endBar], async () => {
@@ -240,9 +264,10 @@ export default {
         } else {
           try {
             const response = await getMidiFileInfo(startBar.value, endBar.value); // ✅ Fetch tempo from backend
-            chartData.value.datasets[0].data = response.midiNotes;
-            chartData.value.datasets[1].data = null;
+            chartData.value.datasets[0].data = response.midiNotesPoints;
+            //chartData.value.datasets[1].data = null;
             chartData.value.labels = response.labels;
+            //midiNotes.value = response.midiNotes;
           } catch (error) {
             errorMessage.value = "Failed to fetch tempo.";
           }
@@ -256,9 +281,7 @@ export default {
       }
     });
 
-
-
-    return { loadingMessage, startBar, endBar, isLoading, errorMessage, fileUploaded, chartData, handleFileUploaded, startRecordingAudio, cancelRecordingProcess, selectedFile, isRecordingCancelled, countdown, playFirstNote, tempo };
+    return { isInCountdown, isProcessingAudio, isRecording, midiNotes, loadingRecordingMessage, loadingProcessingMessage, startBar, endBar, errorMessage, fileUploaded, chartData, handleFileUploaded, startRecordingAudio, cancelRecordingProcess, selectedFile, isRecordingCancelled, countdown, playFirstNote, tempo };
   },
 };
 </script>

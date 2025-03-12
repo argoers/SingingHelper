@@ -1,7 +1,7 @@
 <template>
   <div class="file-upload">
     <input type="file" ref="fileInput" @change="handleFileUpload" hidden />
-    <button :disabled="isLoading || countdown > 0" @click="openFileDialog">📂 Upload MIDI File</button>
+    <button :disabled="isRecordingProcessActive" @click="openFileDialog">📂 Upload MIDI File</button>
     <p v-if="selectedFile">Selected file: {{ selectedFile.name }}</p>
   </div>
 </template>
@@ -12,8 +12,7 @@ import { uploadFile } from "../services/api";
 
 export default {
   props: {
-    isLoading: Boolean,
-    countdown: Number
+    isRecordingProcessActive: Boolean,
   },
   emits: ["file-uploaded"],
   setup(props, { emit }) {

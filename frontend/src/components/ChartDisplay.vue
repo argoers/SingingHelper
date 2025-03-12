@@ -20,6 +20,14 @@ import { ref, onMounted, watch } from "vue";
 
 ChartJS.register(Title, Tooltip, Legend, LineController, LineElement, PointElement, LinearScale, CategoryScale);
 
+export const midiToNote = (midi) => {
+  if (midi === null || midi < 0) return "";
+  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const octave = Math.floor(midi / 12) - 1;
+  const note = noteNames[midi % 12];
+  return `${note}${octave}`;
+};
+
 export default {
   props: {
     chartData: {
@@ -27,6 +35,8 @@ export default {
       required: true
     },
     isRecordingCancelled: Boolean
+  }, functions: {
+    midiToNote
   },
   setup(props) {
     const chartCanvas = ref(null);
@@ -58,9 +68,7 @@ export default {
             autoSkip: false,
             stepSize: 1,
             maxRotation: 0,
-            callback: function (value, index) {
-              return props.chartData.labels[index] ? props.chartData.labels[index] : null;
-            }
+            callback: (value, index) => props.chartData.labels[index] ? props.chartData.labels[index] : null
           },
         },
         y: {
@@ -87,21 +95,13 @@ export default {
       });
     };
 
-    const midiToNote = (midi) => {
-      if (midi === null || midi < 0) return "";
-      const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-      const octave = Math.floor(midi / 12) - 1;
-      const note = noteNames[midi % 12];
-      return `${note}${octave}`;
-    };
+    /* onMounted(() => {
+      createChart();
+    }); */
 
-    onMounted(() => {
+    watch(props.chartData.datasets[1], () => {
       createChart();
     });
-
-    watch(() => props.chartData, () => {
-      createChart();
-    }, { deep: true });
 
     return { chartCanvas };
   }

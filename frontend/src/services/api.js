@@ -62,7 +62,7 @@ export const getMidiFileInfo = async (startBar, endBar) => {
     const barAxis = Array.from({ length: numPoints }, (_, i) => startBar + i * barStep);
     const labels = barAxis.map((b, i) => (i % (numPoints / numBars) === 0 ? `Bar ${Math.round(b)}` : ""));
 
-    return { labels: labels, midiNotes: midiMapped }
+    return { labels: labels, midiNotesPoints: midiMapped, midiNotes: data.midi_notes }
   } catch (error) {
     console.error("❌ Upload request failed:", error);
     return false;
@@ -131,24 +131,6 @@ export const recordAudio = async (startBar, endBar, tempo) => {
   }
 };
 
-// ✅ Add Cancel Recording Function
-export const cancelRecording = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/cancel-recording`, {
-      method: "POST",
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    console.log("❌ Recording canceled successfully.");
-    return true;
-  } catch (error) {
-    console.error("❌ Failed to cancel recording:", error);
-    return false;
-  }
-};
-
 export const getTempo = async () => {
   const response = await fetch(`${API_BASE_URL}/get-tempo`);
   if (!response.ok) {
@@ -161,6 +143,14 @@ export const getBarTotal = async () => {
   const response = await fetch(`${API_BASE_URL}/get-bar-total`);
   if (!response.ok) {
     throw new Error("Failed to fetch bar range.");
+  }
+  return await response.json();
+};
+
+export const getTimeSignature = async () => {
+  const response = await fetch(`${API_BASE_URL}/get-time-signature`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch time signature.");
   }
   return await response.json();
 };

@@ -10,8 +10,6 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 MIDI_FILE = None  # Stores the latest uploaded MIDI file path
-# ✅ Variable to track if recording is in progress
-is_recording = False
 AUDIO = None
 DURATION = None
 api_routes = Blueprint("api_routes", __name__)
@@ -41,11 +39,8 @@ def upload_midi():
 # ✅ Compare MIDI Notes & Singing
 @api_routes.route("/record", methods=["POST"])
 def record():
-    global is_recording
     global AUDIO
     global DURATION
-    is_recording=True
-    
     try:
         data = request.get_json()
         start_bar = int(data.get("start_bar", 1))
@@ -65,15 +60,6 @@ def record():
 def extract():
     live_pitches = extract_pitches(AUDIO)
     return jsonify({"live_pitches": live_pitches.tolist(), "duration": DURATION })
-    
-@api_routes.route("/cancel-recording", methods=["POST"])
-def cancel_recording():
-    global is_recording
-    if not is_recording:
-        return jsonify({"error": "No recording in progress"}), 400
-
-    is_recording = False
-    return jsonify({"message": "Recording canceled"})
 
 @api_routes.get("/get-tempo")
 def get_midi_tempo():
@@ -87,6 +73,15 @@ def get_midi_tempo():
 def get_midi_bar_total():
     try:
         return {"bar_total": get_bar_total(MIDI_FILE)}
+    
+    except Exception as e:
+        return {"error": str(e)}
+    
+@api_routes.get("/get-time-signature")
+def get_midi_time_signature():
+    try:
+        ts_numerator, ts_denominator = get_time_signature(MIDI_FILE)
+        return {"numerator": ts_numerator,"denominator": ts_denominator}
     
     except Exception as e:
         return {"error": str(e)}
