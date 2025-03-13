@@ -5,9 +5,10 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from "vue";
+import { ref, onMounted, watch, computed, watchEffect } from "vue";
 import { midiToNote } from "./ChartDisplay.vue"
 import { getTimeSignature } from "../services/api";
+import { useWindowSize } from "@vueuse/core";
 
 export default {
     props: {
@@ -27,18 +28,25 @@ export default {
         let pxPerBeat;
         let pxPerSecond;
         let scrollSpeed;
-        let firstNotePositionX = 200;
+        let firstNotePositionX;
         let lastNotePositionX;
         let minNotePitch = Math.min(...props.midiNotes.map(e => e[2]));
+        let maxNotePitch = Math.max(...props.midiNotes.map(e => e[2]));
+        console.log(props.midiNotes.findIndex(e => e[2] === maxNotePitch));
         let startTime;
         let endTime;
 
         onMounted(async () => {
-            canvas.value.width = 1300;
-            canvas.value.height = 200;
             setUpNotes();
         });
 
+        watchEffect(() => {
+            if (!canvas.value) return;
+            canvas.value.width = 0.7 * useWindowSize().width.value;
+            canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5);
+            firstNotePositionX = canvas.value.height;
+            setUpNotes();
+        })
         watch(
             () => props.isRecording,
             (isRecording) => {
@@ -54,15 +62,22 @@ export default {
         const endBarComputed = computed(() => props.endBar);
         const isRecordingComputed = computed(() => props.isRecording);
         const midiNotesComputed = computed(() => props.midiNotes);
+        const tempoComputed = computed(() => props.tempo);
         watch(midiNotesComputed, () => {
             minNotePitch = Math.min(...props.midiNotes.map(e => e[2]));
+            maxNotePitch = Math.max(...props.midiNotes.map(e => e[2]));
         })
-        watch([isRecordingComputed, midiNotesComputed], () => {
+        watch([isRecordingComputed, midiNotesComputed, tempoComputed], () => {
             if (!isRecordingComputed.value) {
                 setUpNotes();
             }
         });
+
         const setUpNotes = async () => {
+            canvas.value.width = 0.7 * useWindowSize().width.value;
+            canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5);
+            console.log(maxNotePitch, minNotePitch, canvas.value.height)
+            firstNotePositionX = canvas.value.height;
             try {
                 const data = await getTimeSignature();
                 beatsPerBar = data.numerator;
@@ -134,7 +149,7 @@ export default {
             if (!props.isRecording) return;
             ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
             drawPlayhead(); // ✅ Keep the playhead in place
-            for (let i = 1; i * 10 < canvas.width; i++) {
+            for (let i = 1; i * 10 < canvas.value.width; i++) {
                 drawPlayhead(i);
             }
             notes.forEach((note) => {
@@ -147,6 +162,7 @@ export default {
         };
 
         const getYPosition = (midiNote) => {
+            console.log(midiToNote(minNotePitch))
             return canvas.value.height - (midiNote - minNotePitch + 2) * 10; // Middle C (MIDI 60) is centered
         };
 
@@ -163,8 +179,8 @@ export default {
 
 <style scoped>
 .visualizer-container {
-    width: 1300px;
-    height: 200px;
+    width: 70%;
+    height: 100%;
     border: 1px solid black;
     overflow: hidden;
     background-color: white;
@@ -176,7 +192,6 @@ export default {
     /* Centers vertically */
     margin: auto;
     margin-top: 50px;
-
 }
 
 canvas {

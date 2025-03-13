@@ -14,7 +14,6 @@ AUDIO = None
 DURATION = None
 api_routes = Blueprint("api_routes", __name__)
 
-# ✅ Upload MIDI File
 @api_routes.route("/upload-midi", methods=["POST"])
 def upload_midi():
     global MIDI_FILE
@@ -35,8 +34,6 @@ def upload_midi():
 
     return jsonify({"message": "MIDI file uploaded successfully!", "filename": file.filename})
 
-
-# ✅ Compare MIDI Notes & Singing
 @api_routes.route("/record", methods=["POST"])
 def record():
     global AUDIO
@@ -46,10 +43,14 @@ def record():
         start_bar = int(data.get("start_bar", 1))
         end_bar = int(data.get("end_bar", 4))
         tempo = int(data.get("tempo", 120))
+        
+        if len(data) > 3:
+            microphone = data.get("microphone")
+            
         start_time, end_time, bpm = bars_to_time_range(MIDI_FILE, start_bar, end_bar)
         DURATION = end_time - start_time
         DURATION *= bpm / tempo
-        AUDIO = record_audio(duration=DURATION)
+        AUDIO = record_audio(duration=DURATION, mic=microphone)
 
         return jsonify({"message": "recorded"})
 
@@ -86,7 +87,6 @@ def get_midi_time_signature():
     except Exception as e:
         return {"error": str(e)}
     
-# ✅ Compare MIDI Notes & Singing
 @api_routes.route("/get-midi-notes", methods=["POST"])
 def get_midi_notes():
     global MIDI_FILE
@@ -105,4 +105,3 @@ def get_midi_notes():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-

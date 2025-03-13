@@ -29,7 +29,6 @@ def get_bar_total(midi_file):
         print(f"Error extracting MIDI bars: {e}")
         return 4
 
-# ✅ Extract Tempo & Time Signature
 def get_time_signature(midi_file):
     try:
         midi_data = pretty_midi.PrettyMIDI(midi_file)
@@ -44,7 +43,6 @@ def get_time_signature(midi_file):
         return 4, 4
 
 
-# ✅ Convert Bars to Time Range
 def bars_to_time_range(midi_file, start_bar, end_bar):
     ts_numerator, ts_denominator = get_time_signature(midi_file)
     bpm = get_tempo(midi_file)
@@ -59,7 +57,6 @@ def bars_to_time_range(midi_file, start_bar, end_bar):
     return start_time, end_time, bpm  
 
 
-# ✅ Extract MIDI Notes within Selected Time Range
 def extract_midi_notes_in_range(midi_file, start_time, end_time):
     try:
         midi_data = pretty_midi.PrettyMIDI(midi_file)

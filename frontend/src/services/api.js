@@ -25,7 +25,7 @@ export const uploadFile = async (file) => {
   }
 };
 
-export const getMidiFileInfo = async (startBar, endBar) => {
+export const getMidiFileInfo = async (startBar, endBar, numberOfLabelPoints) => {
   try {
     const response = await fetch(`${API_BASE_URL}/get-midi-notes`, {
       method: "POST",
@@ -42,8 +42,9 @@ export const getMidiFileInfo = async (startBar, endBar) => {
       end: note[1],
       pitch: note[2],
     }));
-
-    let numPoints = 100;
+    console.log(data)
+    if (!numberOfLabelPoints) return { midiNotes: data.midi_notes }
+    let numPoints = numberOfLabelPoints;
     const numBars = endBar - startBar + 1;
     while (numPoints % numBars !== 0) {
       numPoints += 1;
@@ -67,6 +68,11 @@ export const getMidiFileInfo = async (startBar, endBar) => {
     console.error("❌ Upload request failed:", error);
     return false;
   }
+};
+
+export const getMidiNotes = async (startBar, endBar) => {
+  const data = await getMidiFileInfo(startBar, endBar, null);
+  return { midiNotes: data.midiNotes }
 };
 
 export const extractPitchesFromAudio = async (startBar, endBar) => {
@@ -111,12 +117,12 @@ export const extractPitchesFromAudio = async (startBar, endBar) => {
   }
 }
 
-export const recordAudio = async (startBar, endBar, tempo) => {
+export const recordAudio = async (startBar, endBar, tempo, microphone) => {
   try {
     const response = await fetch(`${API_BASE_URL}/record`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo }),
+      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo, microphone: microphone }),
     });
 
     const data = await response.json();

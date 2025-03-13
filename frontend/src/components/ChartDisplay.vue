@@ -16,7 +16,7 @@ import {
   LinearScale,
   CategoryScale
 } from "chart.js";
-import { ref, onMounted, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 
 ChartJS.register(Title, Tooltip, Legend, LineController, LineElement, PointElement, LinearScale, CategoryScale);
 
@@ -83,7 +83,7 @@ export default {
 
     const createChart = () => {
       if (chartInstance) {
-        chartInstance.destroy(); // Destroy previous instance to prevent memory leaks
+        chartInstance.destroy();
       }
 
       if (!props.chartData || !props.chartData.labels.length || props.isRecordingCancelled) return;
@@ -91,15 +91,15 @@ export default {
       chartInstance = new ChartJS(chartCanvas.value, {
         type: "line",
         data: props.chartData,
-        options: chartOptions
+        options: chartOptions,
       });
     };
 
-    /* onMounted(() => {
+    onMounted(() => {
       createChart();
-    }); */
+    });
 
-    watch(props.chartData.datasets[1], () => {
+    watch(props.chartData, () => {
       createChart();
     });
 
@@ -110,8 +110,16 @@ export default {
 
 <style scoped>
 .chart-container {
-  width: 100%;
+  width: 70%;
   height: 100%;
+  /* ✅ Center Horizontally & Vertically */
+  display: flex;
+  justify-content: center;
+  /* Centers horizontally */
+  align-items: center;
+  /* Centers vertically */
+  margin: auto;
+  margin-top: 50px;
 }
 
 canvas {

@@ -2,19 +2,28 @@ import sounddevice as sd
 import numpy as np
 import librosa
 
-# ✅ Record Audio
-def record_audio(duration=5, samplerate=44100):
+def find_microphone(mic):
+    """Lists available input devices (microphones)."""
+    devices = sd.query_devices()
+    print("\nAvailable Input Devices:\n")
+    for i, device in enumerate(devices):
+        if device['name'] == mic.split(')',1)[0]+')' and device['max_input_channels'] > 0:  # Only show input devices
+            return i
+
+def record_audio(duration=5, samplerate=44100, mic='default'):
     try:
         print(f"🎤 Recording for {duration:.2f} seconds...")
-        audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype="float32")
+        if mic != 'default':
+            mic_id = find_microphone(mic)
+            #sd.default.device = mic_id
+        print(mic_id)
+        audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype="float32", device=mic_id)
         sd.wait()
         return np.squeeze(audio)
     except Exception as e:
         print(f"Error recording audio: {e}")
         return np.array([])
 
-
-# ✅ Extract Singing Pitches
 def extract_pitches(audio, samplerate=44100, hop_size=512):
     if audio is None or len(audio) == 0:
         return np.array([])

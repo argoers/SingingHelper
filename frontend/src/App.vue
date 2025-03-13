@@ -1,5 +1,19 @@
 <template>
   <div class="container">
+    <div>
+      <h2>Select a Microphone</h2>
+
+      <label for="micSelect">Microphone:</label>
+      <select v-model="selectedDeviceId" id="micSelect">
+        <option v-for="(device, index) in microphones" :key="device.deviceId" :value="device.deviceId">
+          {{ device.label || `Microphone ${index + 1}` }}
+        </option>
+      </select>
+
+      <button @click="getMicrophones">Refresh List</button>
+
+      <p v-if="selectedDeviceId">Selected Microphone: {{ selectedMicLabel }}</p>
+    </div>
     <h2>🎼 Compare MIDI & Singing</h2>
 
     <div class="upload-section">
@@ -40,11 +54,11 @@
 </template>
 
 <script>
-import { ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import FileUpload from "./components/FileUpload.vue";
 import BarSelection from "./components/BarSelection.vue";
 import ChartDisplay from "./components/ChartDisplay.vue";
-import { recordAudio, getTempo, getMidiFileInfo, extractPitchesFromAudio, getBarTotal, getTimeSignature } from "./services/api";
+import { getMidiNotes, recordAudio, getTempo, getMidiFileInfo, extractPitchesFromAudio, getBarTotal, getTimeSignature } from "./services/api";
 import metronomeSound from "@/assets/metronome.mp3";
 import NoteVisualization from "./components/NoteVisualization.vue";
 
@@ -56,6 +70,30 @@ export default {
     NoteVisualization
   },
   setup() {
+    const getMicrophones = async () => {
+      try {
+        // Request microphone permission
+        //await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Get all media devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        selectedDeviceId.value = devices[2].deviceId;
+        // Filter only audio input devices (microphones)
+        microphones.value = devices.filter(device => device.kind === "audioinput").slice(2);
+      } catch (error) {
+        console.error("Error accessing microphones:", error);
+      }
+    }
+
+    onMounted(() => getMicrophones())
+    const microphones = ref([]);
+    const selectedDeviceId = ref(null);
+    const selectedMicLabel = computed(() => {
+      const mic = microphones.value.find(device => device.deviceId === selectedDeviceId.value);
+      return mic ? mic.label || `Microphone` : "None";
+    });
+
     const loadingRecordingMessage = ref('🎤 Sing now!');
     const loadingProcessingMessage = ref("Processing audio");
     const startBar = ref(1);
@@ -143,9 +181,7 @@ export default {
 
 
       try {
-        const response = await getMidiFileInfo(startBar.value, endBar.value); // ✅ Fetch tempo from backend
-        chartData.value.datasets[0].data = response.midiNotesPoints;
-        chartData.value.labels = response.labels;
+        const response = await getMidiNotes(startBar.value, endBar.value); // ✅ Fetch tempo from backend
         midiNotes.value = response.midiNotes;
       } catch (error) {
         errorMessage.value = "Failed to fetch MIDI notes.";
@@ -185,7 +221,7 @@ export default {
       const gainNode = audioCtx.createGain();
 
       const firstNoteFrequency = chartData.value.datasets[0].data.filter(value => value)[0];
-      oscillator.frequency.setValueAtTime(firstNoteFrequency * 4, audioCtx.currentTime);
+      oscillator.frequency.setValueAtTime(440 * Math.pow(2, (firstNoteFrequency - 69) / 12), audioCtx.currentTime);
       gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
       //gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
 
@@ -205,7 +241,7 @@ export default {
       countdown.value = timeSignature.value[0] * 2; // ✅ Start countdown from 3
 
       playMetronome(true);
-      
+
       while (countdown.value > 0) {
         await new Promise(resolve => setTimeout(resolve, (60 / tempo.value) * 1000)); // Wait 1 sec
         countdown.value--;
@@ -215,12 +251,12 @@ export default {
       isRecording.value = true;
 
       try {
-        await recordAudio(startBar.value, endBar.value, tempo.value);
+        await recordAudio(startBar.value, endBar.value, tempo.value, selectedMicLabel.value ?? 'default');
       } catch (error) {
         errorMessage.value = error.message;
       }
       if (currentSession !== requestSession || isRecordingCancelled.value) return;
-      
+
       isRecording.value = false;
       stopMetronome();
 
@@ -230,6 +266,7 @@ export default {
         const data = await extractPitchesFromAudio(startBar.value, endBar.value);
         if (currentSession === requestSession && !isRecordingCancelled.value) {
           chartData.value.datasets[1].data = data.liveNotes;
+          console.log(data.liveNotes)
         }
       } catch (error) {
         errorMessage.value = error.message;
@@ -237,12 +274,23 @@ export default {
 
       if (currentSession === requestSession) {
         isProcessingAudio.value = false;
+        try {
+          console.log(chartData.value.datasets[1].data)
+          console.log(chartData.value.datasets[1].data.length)
+          const data = await getMidiFileInfo(startBar.value, endBar.value, chartData.value.datasets[1].data.length)
+          //console.log(data)
+          chartData.value.datasets[0].data = data.midiNotesPoints;
+          chartData.value.labels = data.labels;
+          //console.log(data.labels)
+        } catch (error) {
+          errorMessage.value = error.message;
+        }
       }
     };
 
     const cancelRecordingProcess = async () => {
       stopMetronome();
-      
+
       isRecordingCancelled.value = true;
       isRecording.value = false;
       isProcessingAudio.value = false;
@@ -263,10 +311,10 @@ export default {
           startBar.value = 1
         } else {
           try {
-            const response = await getMidiFileInfo(startBar.value, endBar.value); // ✅ Fetch tempo from backend
-            chartData.value.datasets[0].data = response.midiNotesPoints;
+            //const response = await getMidiFileInfo(startBar.value, endBar.value, ); // ✅ Fetch tempo from backend
+            //chartData.value.datasets[0].data = response.midiNotesPoints;
             //chartData.value.datasets[1].data = null;
-            chartData.value.labels = response.labels;
+            //chartData.value.labels = response.labels;
             //midiNotes.value = response.midiNotes;
           } catch (error) {
             errorMessage.value = "Failed to fetch tempo.";
@@ -281,7 +329,7 @@ export default {
       }
     });
 
-    return { isInCountdown, isProcessingAudio, isRecording, midiNotes, loadingRecordingMessage, loadingProcessingMessage, startBar, endBar, errorMessage, fileUploaded, chartData, handleFileUploaded, startRecordingAudio, cancelRecordingProcess, selectedFile, isRecordingCancelled, countdown, playFirstNote, tempo };
+    return { selectedMicLabel, selectedDeviceId, getMicrophones, microphones, isInCountdown, isProcessingAudio, isRecording, midiNotes, loadingRecordingMessage, loadingProcessingMessage, startBar, endBar, errorMessage, fileUploaded, chartData, handleFileUploaded, startRecordingAudio, cancelRecordingProcess, selectedFile, isRecordingCancelled, countdown, playFirstNote, tempo };
   },
 };
 </script>
@@ -289,7 +337,7 @@ export default {
 <style scoped>
 .container {
   text-align: center;
-  max-width: 1400px;
+  max-width: 100%;
   margin: auto;
 }
 
