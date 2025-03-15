@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://127.0.0.1:5000";
+const API_BASE_URL = "http://127.0.0.1:5001";
 
 export const uploadFile = async (file) => {
   const formData = new FormData();
@@ -42,7 +42,7 @@ export const getMidiFileInfo = async (startBar, endBar, numberOfLabelPoints) => 
       end: note[1],
       pitch: note[2],
     }));
-    console.log(data)
+    
     if (!numberOfLabelPoints) return { midiNotes: data.midi_notes }
     let numPoints = numberOfLabelPoints;
     const numBars = endBar - startBar + 1;
@@ -117,12 +117,12 @@ export const extractPitchesFromAudio = async (startBar, endBar) => {
   }
 }
 
-export const recordAudio = async (startBar, endBar, tempo, microphone) => {
+export const recordAudio = async (startBar, endBar, tempo, /* microphone */) => {
   try {
     const response = await fetch(`${API_BASE_URL}/record`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo, microphone: microphone }),
+      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo, /* microphone: microphone */ }),
     });
 
     const data = await response.json();
@@ -155,6 +155,14 @@ export const getBarTotal = async () => {
 
 export const getTimeSignature = async () => {
   const response = await fetch(`${API_BASE_URL}/get-time-signature`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch time signature.");
+  }
+  return await response.json();
+};
+
+export const quitApplication = async () => {
+  const response = await fetch(`${API_BASE_URL}/quit`);
   if (!response.ok) {
     throw new Error("Failed to fetch time signature.");
   }

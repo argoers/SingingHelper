@@ -38,19 +38,17 @@ def upload_midi():
 def record():
     global AUDIO
     global DURATION
+    print("Recording audio...")
     try:
         data = request.get_json()
         start_bar = int(data.get("start_bar", 1))
         end_bar = int(data.get("end_bar", 4))
         tempo = int(data.get("tempo", 120))
         
-        if len(data) > 3:
-            microphone = data.get("microphone")
-            
         start_time, end_time, bpm = bars_to_time_range(MIDI_FILE, start_bar, end_bar)
         DURATION = end_time - start_time
         DURATION *= bpm / tempo
-        AUDIO = record_audio(duration=DURATION, mic=microphone)
+        AUDIO = record_audio(duration=DURATION)
 
         return jsonify({"message": "recorded"})
 
@@ -87,6 +85,17 @@ def get_midi_time_signature():
     except Exception as e:
         return {"error": str(e)}
     
+@api_routes.get("/quit")
+def quit():
+    print("Stopping frontend and backend...")
+
+    # Stop Vue running on port 5173
+    os.system("lsof -t -i:3000 | xargs kill")
+
+    # Stop backend
+    os._exit(0) 
+    return {"message": "Stopped"}   
+
 @api_routes.route("/get-midi-notes", methods=["POST"])
 def get_midi_notes():
     global MIDI_FILE
