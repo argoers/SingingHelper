@@ -28,7 +28,7 @@ cd deploy
 echo "Building executable..."
 pyinstaller --onefile --windowed \
   --add-data "static:static" --add-data ".:." \
-  --workpath . --specpath . --distpath ..
+  --workpath . --specpath . --distpath .. app.py
 
 # Move back to the root directory
 cd ..
@@ -36,5 +36,6 @@ cd ..
 # Delete deploy folder
 echo "Cleaning up deploy folder..."
 rm -rf deploy
+rm -rf frontend/dist
 
 echo "Build completed successfully!"

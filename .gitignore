@@ -33,4 +33,5 @@ __pycache__/
 uploads/
 venv/
 app.exe
+app.app
 dist/
