@@ -1,8 +1,16 @@
-# Lõputöö
+# Lõputöö – Singing Helper
 
-## Project Setup
+A **Vue + Flask** project designed to assist choir singers in learning their vocal parts efficiently.
 
-### Backend
+## Run the Project
+Executable files for **Windows and Mac/Linux** are available under **Releases**.
+
+## Modify the Project
+
+### Requirements
+This is a **Vue + Flask** project. You need:
+- **Node.js** (for the frontend)
+- **Python 3** (for the backend)
 
 ```sh
 cd backend
@@ -13,7 +21,7 @@ pip install -r requirements.txt
 python src/app.py         # Run Flask backend
 ```
 
-### Compile and Hot-Reload for Development
+### Run frontend
 
 ```sh
 cd frontend
@@ -21,14 +29,14 @@ npm install
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
-
+## Build project
+### Windows (CMD)
 ```sh
-npm run build
+build_win.bat
 ```
 
-### Lint with [ESLint](https://eslint.org/)
-
+### Mac/Linux
 ```sh
-npm run lint
+chmod +x ./build_mac.sh
+./build_mac.sh
 ```
