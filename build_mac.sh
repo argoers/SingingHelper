@@ -26,9 +26,9 @@ cd deploy
 
 # Build the executable with PyInstaller
 echo "Building executable..."
-pyinstaller --onefile --windowed \
+pyinstaller --onefile --windowed --name "SingingHelper" \
   --add-data "static:static" --add-data ".:." \
-  --workpath . --specpath . --distpath .. app.py
+  --workpath . --specpath . --distpath .. app_build.py
 
 # Move back to the root directory
 cd ..

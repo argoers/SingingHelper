@@ -20,9 +20,9 @@ cd deploy
 
 :: Build the executable with PyInstaller
 echo Building executable...
-pyinstaller --onefile --noconsole ^
+pyinstaller --onefile --noconsole --name "SingingHelper" ^
   --add-data "static;static" --add-data ".;." ^
-  --workpath . --specpath . --distpath ..\.. app.py
+  --workpath . --specpath . --distpath ..\.. app_build.py
 
 :: Go back to the root directory
 cd ..
