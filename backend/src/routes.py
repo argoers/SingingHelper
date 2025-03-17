@@ -90,7 +90,7 @@ def quit():
     print("Stopping frontend and backend...")
 
     # Stop Vue running on port 5173
-    os.system("lsof -t -i:3000 | xargs kill")
+    os.system("lsof -t -i:5001 | xargs kill")
 
     # Stop backend
     os._exit(0) 

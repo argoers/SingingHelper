@@ -1,3 +1,0 @@
-([('backend',
-   '/Users/argoers/Documents/GitHub/SingingHelper/backend/src/dist/backend',
-   'EXECUTABLE')],)
