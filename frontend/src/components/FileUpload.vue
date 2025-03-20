@@ -1,51 +1,53 @@
 <template>
   <div class="file-upload">
     <input type="file" ref="fileInput" @change="handleFileUpload" hidden />
-    <button :disabled="isRecordingProcessActive" @click="openFileDialog">📂 Upload MIDI File</button>
+    <button :disabled="isRecordingProcessActive" @click="openFileDialog">
+      Upload your MIDI File
+    </button>
     <p v-if="selectedFile">Selected file: {{ selectedFile.name }}</p>
   </div>
 </template>
 
-<script>
-import { ref } from "vue";
-import { uploadFile } from "../services/api";
+<script lang="js">
+import { ref } from 'vue'
+import { uploadFile } from '../services/api'
 
 export default {
   props: {
     isRecordingProcessActive: Boolean,
   },
-  emits: ["file-uploaded"],
+  emits: ['file-uploaded'],
   setup(props, { emit }) {
-    const selectedFile = ref(null);
-    const fileInput = ref(null);
+    const selectedFile = ref(null)
+    const fileInput = ref(null)
 
     const openFileDialog = () => {
-      fileInput.value.click();
-    };
+      fileInput.value.click()
+    }
 
     const handleFileUpload = async (event) => {
       const file = event.target.files[0]
-      if (!file) return;
+      if (!file) return
 
-      const success = await uploadFile(file);
+      const success = await uploadFile(file)
 
       if (!success) {
-        selectedFile.value = null;
+        selectedFile.value = null
       } else {
-        selectedFile.value = file;
+        selectedFile.value = file
       }
 
-      emit("file-uploaded", success);
-    };
+      emit('file-uploaded', success)
+    }
 
-    return { selectedFile, fileInput, openFileDialog, handleFileUpload };
+    return { selectedFile, fileInput, openFileDialog, handleFileUpload }
   },
-};
+}
 </script>
 
 <style scoped>
 .file-upload button {
-  background-color: #008CBA;
+  background-color: #008cba;
   color: white;
   padding: 10px 15px;
   cursor: pointer;

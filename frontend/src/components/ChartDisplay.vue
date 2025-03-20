@@ -4,7 +4,7 @@
   </div>
 </template>
 
-<script>
+<script lang="js">
 import {
   Chart as ChartJS,
   Title,
@@ -14,53 +14,62 @@ import {
   LineElement,
   PointElement,
   LinearScale,
-  CategoryScale
-} from "chart.js";
-import { ref, computed, watch, onMounted } from "vue";
+  CategoryScale,
+} from 'chart.js'
+import { ref, watch, onMounted } from 'vue'
 
-ChartJS.register(Title, Tooltip, Legend, LineController, LineElement, PointElement, LinearScale, CategoryScale);
+ChartJS.register(
+  Title,
+  Tooltip,
+  Legend,
+  LineController,
+  LineElement,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+)
 
 export const midiToNote = (midi) => {
-  if (midi === null || midi < 0) return "";
-  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  const octave = Math.floor(midi / 12) - 1;
-  const note = noteNames[midi % 12];
-  return `${note}${octave}`;
-};
+  if (midi === null || midi < 0) return ''
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+  const octave = Math.floor(midi / 12) - 1
+  const note = noteNames[midi % 12]
+  return `${note}${octave}`
+}
 
 export default {
   props: {
     chartData: {
       type: Object,
-      required: true
+      required: true,
     },
-    isRecordingCancelled: Boolean
-  }, functions: {
-    midiToNote
+    isRecordingCancelled: Boolean,
+  },
+  functions: {
+    midiToNote,
   },
   setup(props) {
-    const chartCanvas = ref(null);
-    let chartInstance = null;
+    const chartCanvas = ref(null)
+    let chartInstance = null
 
-    // ✅ Function to compute min & max from `chartData`
     const computeMinMaxPitch = () => {
       const allPitches = props.chartData.datasets
-        .flatMap(dataset => dataset.data)
-        .filter(value => value !== null); // Remove null values
-      if (!allPitches) return;
-      chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 1;
-      chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 1;
-    };
+        .flatMap((dataset) => dataset.data)
+        .filter((value) => value !== null) // Remove null values
+      if (!allPitches) return
+      chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 1
+      chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 1
+    }
 
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "top" },
+        legend: { position: 'top' },
         title: {
           display: true,
-          text: ""
-        }
+          text: '',
+        },
       },
       scales: {
         x: {
@@ -68,56 +77,54 @@ export default {
             autoSkip: false,
             stepSize: 1,
             maxRotation: 0,
-            callback: (value, index) => props.chartData.labels[index] ? props.chartData.labels[index] : null
+            callback: (value, index) =>
+              props.chartData.labels[index] ? props.chartData.labels[index] : null,
           },
         },
         y: {
           ticks: {
             autoSkip: false,
             stepSize: 1,
-            callback: (value) => midiToNote(value)
+            callback: (value) => midiToNote(value),
           },
         },
       },
-    };
+    }
 
     const createChart = () => {
       if (chartInstance) {
-        chartInstance.destroy();
+        chartInstance.destroy()
       }
 
-      if (!props.chartData || !props.chartData.labels.length || props.isRecordingCancelled) return;
-      computeMinMaxPitch();
+      if (!props.chartData || !props.chartData.labels.length) return
+      computeMinMaxPitch()
       chartInstance = new ChartJS(chartCanvas.value, {
-        type: "line",
+        type: 'line',
         data: props.chartData,
         options: chartOptions,
-      });
-    };
+      })
+    }
 
     onMounted(() => {
-      createChart();
-    });
+      createChart()
+    })
 
     watch(props.chartData, () => {
-      createChart();
-    });
+      createChart()
+    })
 
-    return { chartCanvas };
-  }
-};
+    return { chartCanvas }
+  },
+}
 </script>
 
 <style scoped>
 .chart-container {
   width: 70%;
   height: 100%;
-  /* ✅ Center Horizontally & Vertically */
   display: flex;
   justify-content: center;
-  /* Centers horizontally */
   align-items: center;
-  /* Centers vertically */
   margin: auto;
   margin-top: 50px;
 }

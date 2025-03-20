@@ -1,25 +1,7 @@
 <template>
-  <div v-if="!areServersStopped" class="container">
-    <button @click="stopServers" class="stop-button">Stop Servers</button>
-    <!-- <div>
-      <h2>Select a Microphone</h2>
-
-      <label for="micSelect">Microphone:</label>
-      <select v-model="selectedDeviceId" id="micSelect">
-        <option
-          v-for="(device, index) in microphones"
-          :key="device.deviceId"
-          :value="device.deviceId"
-        >
-          {{ device.label || `Microphone ${index + 1}` }}
-        </option>
-      </select>
-
-      <button @click="getMicrophones">Refresh List</button>
-
-      <p v-if="selectedDeviceId">Selected Microphone: {{ selectedMicLabel }}</p>
-    </div> -->
-    <h2>🎼 Compare MIDI & Singing</h2>
+  <button @click="stopServers" class="stop-button">Quit Application</button>
+  <div class="container">
+    <h2>Compare MIDI & Singing</h2>
 
     <div class="upload-section">
       <FileUpload
@@ -27,13 +9,14 @@
         :isRecordingProcessActive="isInCountdown || isRecording || isProcessingAudio"
       />
       <p v-if="selectedFile">
-        📂 Selected file: <b>{{ selectedFile }}</b>
+        Selected file: <b>{{ selectedFile }}</b>
       </p>
     </div>
 
     <div v-if="fileUploaded" class="bar-selection">
       <label>Start Bar:</label>
       <input
+        :disabled="isInCountdown || isRecording || isProcessingAudio"
         type="number"
         v-model="startBar"
         @focus="storeLastValidStartBar"
@@ -42,6 +25,7 @@
 
       <label>End Bar:</label>
       <input
+        :disabled="isInCountdown || isRecording || isProcessingAudio"
         type="number"
         v-model="endBar"
         @focus="storeLastValidEndBar"
@@ -51,6 +35,7 @@
       <div v-if="tempo !== null">
         <label>Tempo:</label>
         <input
+          :disabled="isInCountdown || isRecording || isProcessingAudio"
           type="number"
           v-model="tempo"
           @focus="storeLastValidTempo"
@@ -59,24 +44,52 @@
       </div>
     </div>
 
-    <button
-      @click="startRecordingAudio"
-      :disabled="isInCountdown"
-      v-if="!isRecording && !isProcessingAudio && fileUploaded"
-    >
-      🎤 {{ countdown > 0 ? `Starting in ${countdown}...` : 'Start Recording' }}
-    </button>
-    <button @click="cancelRecordingProcess" v-if="isRecording">❌ Cancel Recording</button>
-    <button
-      @click="playFirstNote"
-      v-if="!isRecording && !isInCountdown && !isProcessingAudio && fileUploaded"
-    >
-      Play First Note
-    </button>
-
+    <label v-if="fileUploaded">
+      <input
+        type="checkbox"
+        v-model="isMetronomeEnabled"
+        :disabled="isInCountdown || isRecording || isProcessingAudio"
+      />
+      Do you want to use the metronome?
+    </label>
+    <div>
+      <button
+        @click="startRecordingProcess"
+        :disabled="isInCountdown"
+        v-if="!isRecording && !isProcessingAudio && fileUploaded"
+      >
+        {{ countdown > 0 ? `Recording starting in ${countdown}...` : 'Start Recording' }}
+      </button>
+      <button @click="cancelRecordingProcess" v-if="isRecording">Cancel Recording</button>
+      <button
+        @click="playFirstNote"
+        :disabled="isNoteBeingPlayed"
+        v-if="!isRecording && !isInCountdown && !isProcessingAudio && fileUploaded"
+      >
+        Play First Note
+      </button>
+    </div>
+    <div>
+      <button @click="enableChart" v-if="chartData.datasets[1].data" v-show="!showChart">
+        Show result chart
+      </button>
+      <button @click="enableChart" v-if="chartData.datasets[1].data" v-show="showChart">
+        Hide result chart
+      </button>
+      <button @click="enableReplay" v-if="chartData.datasets[1].data" v-show="!showReplay">
+        Show replay window
+      </button>
+      <button @click="enableReplay" v-if="chartData.datasets[1].data" v-show="showReplay">
+        Hide replay window
+      </button>
+      <button @click="startReplay" v-if="chartData.datasets[1].data" v-show="!isReplaying">
+        Start replay
+      </button>
+      <button @click="stopReplay" v-if="isReplaying">Stop replay</button>
+    </div>
     <p v-if="isRecording">{{ loadingRecordingMessage }}</p>
     <p v-if="isProcessingAudio">{{ loadingProcessingMessage }}</p>
-    <p v-if="errorMessage" class="error">❌ {{ errorMessage }}</p>
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <NoteVisualization
       v-if="midiNotes"
       :midiNotes="midiNotes"
@@ -85,18 +98,30 @@
       :startBar="startBar"
       :endBar="endBar"
     />
+    <NoteReplay @stop-replay="stopReplay"
+      v-if="chartData.datasets[1].data && chartData.datasets[0].data"
+      v-show="showReplay"
+      :midiNotesWithTimes="midiNotes"
+      :midiNotes="chartData.datasets[0].data"
+      :recordedNotes="chartData.datasets[1].data"
+      :isReplaying="isReplaying"
+      :defaultTempo="defaultTempo"
+      :tempo="tempo"
+      :startBar="startBar"
+      :endBar="endBar"
+    />
     <ChartDisplay
-      v-if="chartData.labels.length"
+      v-if="chartData"
+      v-show="showChart"
       :chart-data="chartData"
       :isRecordingCancelled="isRecordingCancelled"
     />
   </div>
 </template>
 
-<script>
-import { computed, onMounted, ref, watch } from 'vue'
+<script lang="js">
+import { ref, watch } from 'vue'
 import FileUpload from './components/FileUpload.vue'
-import BarSelection from './components/BarSelection.vue'
 import ChartDisplay from './components/ChartDisplay.vue'
 import {
   getMidiNotes,
@@ -110,46 +135,26 @@ import {
 } from './services/api'
 import metronomeSound from '@/assets/metronome.mp3'
 import NoteVisualization from './components/NoteVisualization.vue'
+import NoteReplay from './components/NoteReplay.vue'
 
 export default {
   components: {
     FileUpload,
-    BarSelection,
     ChartDisplay,
     NoteVisualization,
+    NoteReplay,
   },
   setup() {
     const stopServers = async () => {
       try {
-        areServersStopped.value = true
         await quitApplication()
+        window.close()
       } catch (error) {
         console.error('Error stopping servers:', error)
       }
     }
-    /* const getMicrophones = async () => {
-      try {
-        // Get all media devices
-        const devices = await navigator.mediaDevices.enumerateDevices()
 
-        //sselectedDeviceId.value = devices[2].deviceId;
-        // Filter only audio input devices (microphones)
-        microphones.value = devices.filter((device) => device.kind === 'audioinput')
-      } catch (error) {
-        console.error('Error accessing microphones:', error)
-      }
-    } 
-
-    onMounted(() => getMicrophones())
-    const microphones = ref([])
-    const selectedDeviceId = ref(null)
-    const selectedMicLabel = computed(() => {
-      const mic = microphones.value.find((device) => device.deviceId === selectedDeviceId.value)
-      return mic ? mic.label || `Microphone` : 'None'
-    }) */
-
-    const areServersStopped = ref(false)
-    const loadingRecordingMessage = ref('🎤 Sing now!')
+    const loadingRecordingMessage = ref('Sing now!')
     const loadingProcessingMessage = ref('Processing audio')
     const startBar = ref(1)
     const endBar = ref(1)
@@ -178,27 +183,48 @@ export default {
           pointRadius: 3,
           fill: false,
           stepped: 'before',
-          spanGaps: true,
+          //spanGaps: true,
         },
       ],
     })
     const selectedFile = ref('')
     const countdown = ref(0)
-    const tempo = ref(null) // Default tempo (BPM)
+    const tempo = ref(null)
     const totalBars = ref(null)
     const defaultTempo = ref(null)
     const midiNotes = ref(null)
     const timeSignature = ref(null)
+    const isMetronomeEnabled = ref(false)
+    const showChart = ref(true)
+    const isNoteBeingPlayed = ref(false)
 
-    let requestSession = 0 // ✅ Track current request session to prevent old updates
+    let requestSession = 0
     let metronomeInterval = null
-    let metronomeAudio = new Audio(metronomeSound) // ✅ Load metronome sound
+    const metronomeAudio = new Audio(metronomeSound)
     metronomeAudio.load()
 
     const resetData = () => {
       chartData.value.labels = {}
-      chartData.value.datasets[0].data = {}
+      chartData.value.datasets[0].data = null
       chartData.value.datasets[1].data = null
+    }
+
+    const enableChart = () => {
+      showChart.value = !showChart.value
+    }
+
+    const showReplay = ref(true)
+    const isReplaying = ref(false)
+
+    const stopReplay = () => {
+      isReplaying.value = false
+    }
+    const enableReplay = () => {
+      showReplay.value = !showReplay.value
+    }
+
+    const startReplay = () => {
+      isReplaying.value = true
     }
 
     const handleFileUploaded = async (success) => {
@@ -207,39 +233,40 @@ export default {
         errorMessage.value = 'Select a MIDI file!'
         resetData()
         return
-      } else {
-        errorMessage.value = ''
       }
 
+      resetData()
+      startBar.value = 1
+
       try {
-        const response = await getTimeSignature() // ✅ Fetch tempo from backend
+        const response = await getTimeSignature()
         timeSignature.value = [response.numerator, response.denominator]
       } catch (error) {
-        errorMessage.value = 'Failed to fetch MIDI notes.'
+        errorMessage.value = error.message
       }
 
       try {
-        const response = await getTempo() // ✅ Fetch tempo from backend
-        let correctTempo = (timeSignature.value[1] / 4) * response.tempo
+        const response = await getTempo()
+        const correctTempo = (timeSignature.value[1] / 4) * response.tempo
         tempo.value = correctTempo
         defaultTempo.value = correctTempo
       } catch (error) {
-        errorMessage.value = 'Failed to fetch tempo.'
+        errorMessage.value = error.message
       }
 
       try {
-        const response = await getBarTotal() // ✅ Fetch tempo from backend
+        const response = await getBarTotal()
         endBar.value = response.bar_total
         totalBars.value = response.bar_total
       } catch (error) {
-        errorMessage.value = 'Failed to fetch bars.'
+        errorMessage.value = error.message
       }
 
       try {
-        const response = await getMidiNotes(startBar.value, endBar.value) // ✅ Fetch tempo from backend
+        const response = await getMidiNotes(startBar.value, endBar.value)
         midiNotes.value = response.midiNotes
       } catch (error) {
-        errorMessage.value = 'Failed to fetch MIDI notes.'
+        errorMessage.value = error.message
       }
     }
 
@@ -256,10 +283,10 @@ export default {
       playClickSound(loud)
       const beatsPerBar = timeSignature.value[0]
       let beatCount = 0
-      const interval = (60 / tempo.value) * 1000 // ✅ Convert BPM to milliseconds
+      const interval = (60 / tempo.value) * 1000
       metronomeInterval = setInterval(() => {
         beatCount = (beatCount + 1) % beatsPerBar
-        playClickSound(beatCount === 0) // Strong beat on 1, weaker on others
+        playClickSound(beatCount === 0)
       }, interval)
     }
 
@@ -275,8 +302,8 @@ export default {
       const oscillator = audioCtx.createOscillator()
       const gainNode = audioCtx.createGain()
 
-      const firstNoteFrequency = chartData.value.datasets[0].data.filter((value) => value)[0]
-      console.log(firstNoteFrequency)
+      const firstNoteFrequency = midiNotes.value[0][2]
+
       oscillator.frequency.setValueAtTime(
         440 * Math.pow(2, (firstNoteFrequency - 69) / 12),
         audioCtx.currentTime,
@@ -286,74 +313,87 @@ export default {
 
       oscillator.connect(gainNode)
       gainNode.connect(audioCtx.destination)
+
       oscillator.start()
-      oscillator.stop(audioCtx.currentTime + 2) // Stop after 100ms */
+      isNoteBeingPlayed.value = true
+
+      oscillator.stop(audioCtx.currentTime + 2)
+      oscillator.onended = () => {
+        isNoteBeingPlayed.value = false
+      }
     }
 
-    const startRecordingAudio = async () => {
+    const startRecordingProcess = async () => {
       const currentSession = ++requestSession
 
+      showChart.value = false
+      showReplay.value = false
       isRecordingCancelled.value = false
       errorMessage.value = ''
 
       isInCountdown.value = true
-      countdown.value = timeSignature.value[0] * 2 // ✅ Start countdown from 3
+      countdown.value = timeSignature.value[0] * 2
 
-      playMetronome(true)
-
-      while (countdown.value > 0) {
-        await new Promise((resolve) => setTimeout(resolve, (60 / tempo.value) * 1000)) // Wait 1 sec
-        countdown.value--
+      if (isMetronomeEnabled.value) {
+        playMetronome(true)
       }
 
+      while (countdown.value > 0) {
+        if (countdown.value === 1) {
+          startRecordingAudio(currentSession)
+        }
+        await new Promise((resolve) => setTimeout(resolve, (60 / tempo.value) * 1000))
+        countdown.value--
+      }
       isInCountdown.value = false
       isRecording.value = true
+    }
 
+    const startRecordingAudio = async (currentSession) => {
       try {
-        await recordAudio(
-          startBar.value,
-          endBar.value,
-          tempo.value,
-          /* selectedMicLabel.value ?? 'default', */
-        )
+        await recordAudio(startBar.value, endBar.value, tempo.value)
       } catch (error) {
         errorMessage.value = error.message
       }
       if (currentSession !== requestSession || isRecordingCancelled.value) return
 
       isRecording.value = false
-      stopMetronome()
 
+      if (isMetronomeEnabled.value) {
+        stopMetronome()
+      }
       isProcessingAudio.value = true
 
       try {
         const data = await extractPitchesFromAudio(startBar.value, endBar.value)
         if (currentSession === requestSession && !isRecordingCancelled.value) {
           chartData.value.datasets[1].data = data.liveNotes
-          console.log(data.liveNotes)
+
+          isProcessingAudio.value = false
+          try {
+            const data = await getMidiFileInfo(
+              startBar.value,
+              endBar.value,
+              chartData.value.datasets[1].data.length,
+            )
+            chartData.value.datasets[0].data = data.midiNotesPoints
+            chartData.value.labels = data.labels
+          } catch (error) {
+            errorMessage.value = error.message
+          }
         }
       } catch (error) {
+        isProcessingAudio.value = false
         errorMessage.value = error.message
       }
-
-      if (currentSession === requestSession) {
-        isProcessingAudio.value = false
-        try {
-          const data = await getMidiFileInfo(
-            startBar.value,
-            endBar.value,
-            chartData.value.datasets[1].data.length,
-          )
-          chartData.value.datasets[0].data = data.midiNotesPoints
-          chartData.value.labels = data.labels
-        } catch (error) {
-          errorMessage.value = error.message
-        }
-      }
+      showChart.value = true
+      showReplay.value = true
     }
 
     const cancelRecordingProcess = async () => {
-      stopMetronome()
+      if (isMetronomeEnabled.value) {
+        stopMetronome()
+      }
 
       isRecordingCancelled.value = true
       isRecording.value = false
@@ -387,10 +427,10 @@ export default {
         tempo.value = lastValidTempo.value
       }
     }
-    const lastValidTempo = ref(null) // Store last valid tempo
+    const lastValidTempo = ref(null)
 
     const storeLastValidTempo = () => {
-      lastValidTempo.value = tempo.value // Save the last valid value
+      lastValidTempo.value = tempo.value
     }
 
     const resetStartBarIfEmpty = () => {
@@ -398,24 +438,34 @@ export default {
         startBar.value = lastValidStartBar.value
       }
     }
-    const lastValidStartBar = ref(null) // Store last valid tempo
+    const lastValidStartBar = ref(null)
 
     const storeLastValidStartBar = () => {
-      lastValidStartBar.value = startBar.value // Save the last valid value
+      lastValidStartBar.value = startBar.value
     }
     const resetEndBarIfEmpty = () => {
       if (!endBar.value) {
         endBar.value = lastValidEndBar.value
       }
     }
-    const lastValidEndBar = ref(null) // Store last valid tempo
+    const lastValidEndBar = ref(null)
 
     const storeLastValidEndBar = () => {
-      lastValidEndBar.value = endBar.value // Save the last valid value
+      lastValidEndBar.value = endBar.value
     }
 
     return {
-      areServersStopped,
+      defaultTempo,
+      isReplaying,
+      stopReplay,
+      enableReplay,
+      startReplay,
+      showReplay,
+      isNoteBeingPlayed,
+      startRecordingProcess,
+      showChart,
+      enableChart,
+      isMetronomeEnabled,
       stopServers,
       storeLastValidStartBar,
       storeLastValidEndBar,
@@ -423,11 +473,6 @@ export default {
       resetStartBarIfEmpty,
       resetTempoIfEmpty,
       storeLastValidTempo,
-      resetTempoIfEmpty,
-      /* selectedMicLabel,
-      selectedDeviceId,
-      getMicrophones,
-      microphones, */
       isInCountdown,
       isProcessingAudio,
       isRecording,

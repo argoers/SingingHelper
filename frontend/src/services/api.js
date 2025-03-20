@@ -13,14 +13,14 @@ export const uploadFile = async (file) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("❌ File upload failed:", data.error);
+      console.error("File upload failed:", data.error);
       return false;
     }
 
-    console.log("✅ File uploaded successfully:", data.filename);
+    console.log("File uploaded successfully:", data.filename);
     return true;
   } catch (error) {
-    console.error("❌ Upload request failed:", error);
+    console.error("Upload request failed:", error);
     return false;
   }
 };
@@ -86,14 +86,14 @@ export const extractPitchesFromAudio = async (startBar, endBar) => {
     }
 
     if (!data.live_pitches) {
-      throw new Error("Missing data in API response");
+      throw new Error("No pitches extracted from the audio.");
     }
 
     const liveTimes = data.live_pitches.map((pitch) => pitch[0]);
     const livePitches = data.live_pitches.map((pitch) => pitch[1]);
 
     if (liveTimes.length === 0) {
-      throw new Error("No valid singing data available");
+      throw new Error("Please sing into the microphone to extract pitches.");
     }
 
     let numPoints = livePitches.length;
@@ -109,20 +109,20 @@ export const extractPitchesFromAudio = async (startBar, endBar) => {
       const closestIndex = liveTimes.findIndex((lt) => Math.abs(lt - t) < timeStep / 2);
       return closestIndex !== -1 ? livePitches[closestIndex] : null;
     });
-    //console.log(data.live_pitches, timeAxis, livePitches, liveTimes, liveMapped)
+    
     return { liveNotes: liveMapped };
 
   } catch (error) {
-    throw new Error("Failed to compare singing: " + error.message);
+    throw new Error(error.message);
   }
 }
 
-export const recordAudio = async (startBar, endBar, tempo, /* microphone */) => {
+export const recordAudio = async (startBar, endBar, tempo) => {
   try {
     const response = await fetch(`${API_BASE_URL}/record`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo, /* microphone: microphone */ }),
+      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo}),
     });
 
     const data = await response.json();

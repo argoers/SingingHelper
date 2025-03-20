@@ -7,7 +7,7 @@ def get_tempo(midi_file):
         pm = pretty_midi.PrettyMIDI(midi_file)
         tempo_changes = pm.get_tempo_changes()
         if len(tempo_changes[1]) > 0:
-            tempo = tempo_changes[1][0]  # Get first detected tempo
+            tempo = tempo_changes[1][0] 
 
         return tempo
     
@@ -20,7 +20,9 @@ def get_bar_total(midi_file):
         pm = pretty_midi.PrettyMIDI(midi_file)
         beats, denominator = get_time_signature(midi_file)
         total_beats = len(pm.get_beats())
-        beats_per_bar = beats / (denominator / 4)
+        
+        beats_per_bar = 16 / denominator
+
         total_bars = total_beats / beats_per_bar
         
         return ceil(total_bars)

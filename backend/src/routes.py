@@ -2,14 +2,14 @@ from flask import Blueprint, jsonify, request
 import os
 from midi_utils import get_time_signature, extract_midi_notes_in_range, bars_to_time_range, get_tempo, get_bar_total
 from audio_utils import record_audio, extract_pitches
-import numpy as np
-import random
+from utils import shutdown_backend
+import threading
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
-MIDI_FILE = None  # Stores the latest uploaded MIDI file path
+MIDI_FILE = None 
 AUDIO = None
 DURATION = None
 api_routes = Blueprint("api_routes", __name__)
@@ -87,15 +87,8 @@ def get_midi_time_signature():
     
 @api_routes.get("/quit")
 def quit():
-    print("Stopping frontend and backend...")
-
-    # Stop Vue running on port 5001 and 5173
-    os.system("lsof -t -i:5001 | xargs kill")
-    os.system("lsof -t -i:5173 | xargs kill")
-
-    # Stop backend
-    os._exit(0) 
-    return {"message": "Stopped"}   
+    threading.Thread(target=shutdown_backend).start()
+    return {"message": "Stopped"}
 
 @api_routes.route("/get-midi-notes", methods=["POST"])
 def get_midi_notes():

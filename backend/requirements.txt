@@ -4,5 +4,4 @@ numpy
 pretty_midi
 librosa
 sounddevice
-setuptools
 pyinstaller

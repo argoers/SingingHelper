@@ -2,21 +2,9 @@ import sounddevice as sd
 import numpy as np
 import librosa
 
-""" def find_microphone(mic):
-    Lists available input devices (microphones).
-    devices = sd.query_devices()
-    print("\nAvailable Input Devices:\n")
-    for i, device in enumerate(devices):
-        if device['name'] == mic.split(')',1)[0]+')' and device['max_input_channels'] > 0:  # Only show input devices
-            return i """
-
 def record_audio(duration=5, samplerate=44100, mic='default'):
     try:
-        """ print(f"🎤 Recording for {duration:.2f} seconds...")
-        if mic != 'default':
-            mic_id = find_microphone(mic)
-            #sd.default.device = mic_id
-        print(mic_id) """
+        duration += 1 # Add 1 second to account for latency
         audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype="float32")
         sd.wait()
         return np.squeeze(audio)
@@ -36,10 +24,12 @@ def extract_pitches(audio, samplerate=44100, hop_size=512):
     )
 
     pitches = np.nan_to_num(pitches, nan=0.0)
-    pitches = pitches[12:]
+    
     pitch_list = [
         (t * hop_size / samplerate, librosa.hz_to_midi(pitch))
         for t, pitch in enumerate(pitches) if pitch > 0
     ]
-
-    return np.array(pitch_list) if pitch_list else np.array([])
+    
+    filtered_pitch_list = [(entry[0]-1, entry[1]) for entry in pitch_list if entry[0] >= 1.0]
+    
+    return np.array(filtered_pitch_list) if filtered_pitch_list else np.array([])
