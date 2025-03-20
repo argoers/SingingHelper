@@ -30,7 +30,7 @@ cd ..
 :: Delete deploy folder
 echo Cleaning up deploy folder...
 rmdir /s /q deploy
-rmdir /s /q frontend\dist
+rmdir /s /q dist
 
 cd ..
 
