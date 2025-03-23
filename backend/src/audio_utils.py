@@ -12,7 +12,7 @@ def record_audio(duration=5, samplerate=44100, mic='default'):
         print(f"Error recording audio: {e}")
         return np.array([])
 
-def extract_pitches(audio, samplerate=44100, hop_size=512):
+def extract_pitches(audio, samplerate=44100, hop_size=256):
     if audio is None or len(audio) == 0:
         return np.array([])
 

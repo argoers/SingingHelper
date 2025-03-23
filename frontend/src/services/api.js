@@ -25,54 +25,32 @@ export const uploadFile = async (file) => {
   }
 };
 
-export const getMidiFileInfo = async (startBar, endBar, numberOfLabelPoints) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/get-midi-notes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_bar: startBar, end_bar: endBar }),
-    });
+export const getMidiStartTimeAndDurationFromMeasures = async (startBar, endBar, tempo) => {
+  const response = await fetch(`${API_BASE_URL}/get-midi-start-time-and-duration-from-measures`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo }),
+  });
 
-    const data = await response.json();
-
-    if (!response.ok) throw new Error(data.error);
-
-    const midiNotes = data.midi_notes.map((note) => ({
-      start: note[0],
-      end: note[1],
-      pitch: note[2],
-    }));
-    
-    if (!numberOfLabelPoints) return { midiNotes: data.midi_notes }
-    let numPoints = numberOfLabelPoints;
-    const numBars = endBar - startBar + 1;
-    while (numPoints % numBars !== 0) {
-      numPoints += 1;
-    }
-
-    const startTime = data.start_time
-    const timeStep = data.duration / numPoints;
-    const timeAxis = Array.from({ length: numPoints }, (_, i) => startTime + i * timeStep);
-
-    const midiMapped = timeAxis.map((t) => {
-      const activeNote = midiNotes.find((note) => note.start <= t && t <= note.end);
-      return activeNote ? activeNote.pitch : null;
-    });
-
-    const barStep = numBars / numPoints;
-    const barAxis = Array.from({ length: numPoints }, (_, i) => startBar + i * barStep);
-    const labels = barAxis.map((b, i) => (i % (numPoints / numBars) === 0 ? `Bar ${Math.round(b)}` : ""));
-
-    return { labels: labels, midiNotesPoints: midiMapped, midiNotes: data.midi_notes }
-  } catch (error) {
-    console.error("❌ Upload request failed:", error);
-    return false;
+  if (!response.ok) {
+    throw new Error("Failed to fetch bar range.");
   }
+  
+  return await response.json();
 };
 
-export const getMidiNotes = async (startBar, endBar) => {
-  const data = await getMidiFileInfo(startBar, endBar, null);
-  return { midiNotes: data.midiNotes }
+export const getMidiNotes = async (startBar, endBar, partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-midi-notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ start_bar: startBar, end_bar: endBar, part_name: partName }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch bar range.");
+  }
+  
+  return await response.json();
 };
 
 export const extractPitchesFromAudio = async (startBar, endBar) => {
@@ -145,18 +123,28 @@ export const getTempo = async () => {
   return await response.json();
 };
 
-export const getBarTotal = async () => {
-  const response = await fetch(`${API_BASE_URL}/get-bar-total`);
+export const getBarInfo = async (partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-bar-info`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ part_name: partName }),
+  });
+  
   if (!response.ok) {
     throw new Error("Failed to fetch bar range.");
   }
   return await response.json();
 };
 
-export const getTimeSignature = async () => {
-  const response = await fetch(`${API_BASE_URL}/get-time-signature`);
+export const getTimeSignature = async (partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-time-signature`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ part_name: partName }),
+  });
+  
   if (!response.ok) {
-    throw new Error("Failed to fetch time signature.");
+    throw new Error("Failed to fetch bar range.");
   }
   return await response.json();
 };
@@ -165,6 +153,14 @@ export const quitApplication = async () => {
   const response = await fetch(`${API_BASE_URL}/quit`);
   if (!response.ok) {
     throw new Error("Failed to fetch time signature.");
+  }
+  return await response.json();
+};
+
+export const getParts = async () => {
+  const response = await fetch(`${API_BASE_URL}/get-parts`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch part names.");
   }
   return await response.json();
 };

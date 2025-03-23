@@ -8,32 +8,33 @@
         type="range"
         class="progress-bar"
         min="0"
-        :max="totalReplayDuration"
+        :max="duration"
         step="0.01"
-        v-model="replayTime"
-        @input="updateReplay"
+        v-model.number="replayTime"
       />
     </div>
   </div>
 </template>
 
 <script lang="js">
-import { ref, onMounted, watch, computed, watchEffect } from 'vue'
+import { ref, onMounted, watch, watchEffect } from 'vue'
 import { midiToNote } from './ChartDisplay.vue'
-import { getTimeSignature } from '../services/api'
 import { useWindowSize } from '@vueuse/core'
 
 export default {
   props: {
-    midiNotes: Object,
     midiNotesWithTimes: Object,
+    midiNotes: Object,
     recordedNotes: Object,
-    isReplaying: Boolean,
-    isReplayWindowOpen: Boolean,
-    defaultTempo: Number,
+    isRecording: Boolean,
     tempo: [Number, String],
     startBar: [Number, String],
     endBar: [Number, String],
+    tempos: Object,
+    durationInSeconds: Number,
+    tempoMultiplier: [Number, String],
+    timeSignatures: Object,
+    startTime: Number,
   },
   emits: ['stop-replay'],
   setup(props, { emit }) {
@@ -41,22 +42,23 @@ export default {
     let ctx = null
     let notes = []
     let animationFrameId
-    let beatsPerBar
-    let beatLength
-    let pxPerBeat
-    let pxPerSecond
-    let scrollSpeed
-    let firstNotePositionX
-    let lastNotePositionX
-    let minNotePitch = Math.min(...props.midiNotes.filter((e) => e))
-    let maxNotePitch = Math.max(...props.midiNotes.filter((e) => e))
-    let startTime
-    let endTime
-    let oneSnippetLength
-    const replayTime = ref(0) // Current replay position
-    const totalReplayDuration = ref(0) // Total duration of the replay
+    let pxPerBeat = 200
+    let pxPerSecond = pxPerBeat / (60 / props.tempos[0].bpm)
 
-    onMounted(async () => {
+    let firstNotePositionX
+    let minNotePitch = Math.min(...props.midiNotesWithTimes.map((e) => e.pitch))
+    let maxNotePitch = Math.max(...props.midiNotesWithTimes.map((e) => e.pitch))
+
+    const replayTime = ref(0)
+    const duration = ref(null)
+    let lastFrameTime = performance.now()
+    let startBeat = 0
+    let startBarOnMount
+    let endBarOnMount
+
+    onMounted(() => {
+      startBarOnMount = props.startBar
+      endBarOnMount = props.endBar
       setUpNotes()
     })
 
@@ -65,203 +67,178 @@ export default {
       canvas.value.width = 0.7 * useWindowSize().width.value
       canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5)
       firstNotePositionX = canvas.value.height
-      if (!newFileOpened) {
-        setUpNotes()
+      console.log('watchEffect')
+      setUpNotes()
+    })
+
+    watch(replayTime, () => {
+      if (!props.isRecording) {
+        drawStaticNotes()
       }
     })
+
     watch(
-      () => props.isReplaying,
-      (isReplaying) => {
-        if (isReplaying) {
-          animate()
+      () => props.midiNotes,
+      () => {
+        replayTime.value = 0
+        startBarOnMount = props.startBar
+        endBarOnMount = props.endBar
+        setUpNotes()
+      },
+    )
+
+    watch(
+      () => props.isRecording,
+      (isRecording) => {
+        if (isRecording) {
+          lastFrameTime = performance.now()
+          requestAnimationFrame(animate)
         } else {
           cancelAnimationFrame(animationFrameId)
         }
       },
     )
 
-    const midiNotesComputed = computed(() => props.midiNotes)
-    const tempoComputed = computed(() => props.tempo)
-    let newFileOpened = true
-    watch(midiNotesComputed, () => {
-      minNotePitch = Math.min(...props.midiNotes.filter((e) => e))
-      maxNotePitch = Math.max(...props.midiNotes.filter((e) => e))
-      newFileOpened = true
-      setUpNotes()
-    })
-    watch(tempoComputed, () => {
-      if (tempoComputed.value) {
-        setScrollSpeedAndTimes()
-      }
-    })
-    
-    const setAllAnimationParameters = () => {
-      pxPerBeat = props.defaultTempo * (4 / beatLength)
-      pxPerSecond = (pxPerBeat * props.defaultTempo) / 60
-      scrollSpeed = pxPerSecond / 60
-      oneSnippetLength =
-        ((props.endBar - props.startBar + 1) * beatsPerBar * (60 / props.defaultTempo)) /
-        props.midiNotes.length
-      setScrollSpeedAndTimes()
-    }
+    const barToBeat = (barNumber, timeSignatures) => {
+      let beats = 0
+      let lastBeatOffset = 0
+      let lastNumerator = 4
+      let lastBarNumber = 0
 
-    const setScrollSpeedAndTimes = () => {
-      startTime = (props.startBar - 1) * beatsPerBar * (60 / props.tempo)
-      endTime = props.endBar * beatsPerBar * (60 / props.tempo)
-      totalReplayDuration.value = endTime - startTime
-      if (!newFileOpened) {
-        scrollSpeed = (pxPerBeat * props.tempo) / 60 / 60
+      for (const ts of timeSignatures) {
+        const tsBeatOffset = ts.offset
+        const tsNumerator = ts.numerator / (ts.denominator / 4)
+
+        const barsBeforeTS = (tsBeatOffset - lastBeatOffset) / lastNumerator
+        const currentBarNumber = lastBarNumber + barsBeforeTS
+
+        if (barNumber < currentBarNumber) break
+
+        beats += (currentBarNumber - lastBarNumber) * lastNumerator
+        lastBeatOffset = tsBeatOffset
+        lastBarNumber = currentBarNumber
+        lastNumerator = tsNumerator
       }
 
-      lastNotePositionX =
-        firstNotePositionX + (props.endBar - props.startBar + 1) * beatsPerBar * pxPerBeat
+      beats += (barNumber - lastBarNumber) * lastNumerator
+      return beats
     }
-    watch(replayTime, () => {
-      drawStaticNotes()
-    })
 
-    const setUpNotes = async () => {
+    const setUpNotes = () => {
+      if (!props.midiNotesWithTimes.length) return
+
+      minNotePitch = Math.min(...props.midiNotesWithTimes.map((e) => e.pitch))
+      maxNotePitch = Math.max(...props.midiNotesWithTimes.map((e) => e.pitch))
+
+      startBeat = barToBeat(startBarOnMount - 1, props.timeSignatures)
+      const endBeat = barToBeat(endBarOnMount, props.timeSignatures)
+
       canvas.value.width = 0.7 * useWindowSize().width.value
       canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5)
-
       firstNotePositionX = canvas.value.height
-      try {
-        const data = await getTimeSignature()
-        beatsPerBar = data.numerator
-        beatLength = data.denominator
-      } catch (error) {
-        errorMessage.value = error.message
-      }
-
-      if (newFileOpened) {
-        setAllAnimationParameters()
-        newFileOpened = false
-      } else {
-        setScrollSpeedAndTimes()
-      }
+      const splitLength = props.durationInSeconds / props.midiNotes.length
 
       ctx = canvas.value.getContext('2d')
 
-      notes = props.midiNotes.map((note, i) => ({
-        pitch: note,
-        x: firstNotePositionX + i * oneSnippetLength * pxPerSecond,
-        y: getYPosition(note),
-        width: oneSnippetLength * pxPerSecond,
-        name: midiToNote(note),
-        isCorrect: props.recordedNotes[i] <= note + 0.25 && props.recordedNotes[i] >= note - 0.25,
-      }))
-      console.log(notes)
+      notes = props.midiNotesWithTimes.map((note, i) => {
+        const timeIndexes = props.midiNotes
+          .map((_, i) => i)
+          .filter((i) => {
+            const time = i * splitLength + props.startTime
+            return (
+              time >= note.start / (props.tempoMultiplier / 100) &&
+              time <= note.end / (props.tempoMultiplier / 100)
+            )
+          })
+        return {
+          pitch: note.pitch,
+          x: firstNotePositionX + (note.offset - startBeat) * pxPerBeat,
+          y: getYPosition(note.pitch),
+          width: note.duration * pxPerBeat,
+          name: midiToNote(note.pitch),
+          startBeat: note.offset,
+          startTime: note.start,
+          duration: note.duration,
+          timeIndexes: timeIndexes,
+        }
+      })
 
-      notes = notes.filter((note) => note.pitch)
-      //console.log(props.recordedNotes, props.midiNotes, props.midiNotesWithTimes)
-      notes = notes.filter((note) => note.x < lastNotePositionX)
+      notes = notes.filter((e) => e.timeIndexes.length > 0 && e.x + e.width > firstNotePositionX)
+      duration.value = endBeat - startBeat
 
-      notes = removeNamesFromConsecutiveNotes(notes)
-      if (props.isReplaying) {
-        animate()
-      }
       drawStaticNotes()
     }
 
-    const removeNamesFromConsecutiveNotes = (notes) => {
-      if (!notes.length) return []
-
-      let mergedNotes = []
-      let midiNotesWithTimesPointer = 0
-      let currentNote = { ...notes[0] }
-      let start = 0
-      const midiNotesWithTimes = props.midiNotesWithTimes.filter(
-        (note) => note[0] >= startTime && note[0] < endTime,
-      )
-
-      for (let i = 1; i < notes.length; i++) {
-        if (notes[i].pitch === currentNote.pitch) {
-          continue
+    const getCurrentTempo = (beat) => {
+      const absoluteBeat = beat + startBeat
+      let currentTempo = props.tempos[0].bpm
+      for (const t of props.tempos) {
+        if (absoluteBeat >= t.offset) {
+          currentTempo = t.bpm
         } else {
-          let end = i - 1
-          let splitParts = 0
-
-          while (
-            midiNotesWithTimesPointer < midiNotesWithTimes.length &&
-            currentNote.pitch === midiNotesWithTimes[midiNotesWithTimesPointer][2]
-          ) {
-            splitParts++
-            midiNotesWithTimesPointer++
-          }
-
-          let step = Math.floor((end - start + 1) / splitParts)
-          let splitIndexes = []
-
-          for (let s = 0; s < splitParts; s++) {
-            let index = start + Math.floor(step / 2) + s * step
-            if (index <= end) {
-              splitIndexes.push(index)
-            }
-          }
-
-          for (let j = start; j <= end; j++) {
-            if (!splitIndexes.includes(j)) {
-              notes[j].name = ''
-            }
-            mergedNotes.push({ ...notes[j] })
-          }
-
-          currentNote = { ...notes[i] }
-          start = i
+          break
         }
       }
+      return currentTempo * (props.tempoMultiplier / 100)
+    }
 
-      let end = notes.length - 1
-      let splitParts = 0
-      while (
-        midiNotesWithTimesPointer < midiNotesWithTimes.length &&
-        currentNote.pitch === midiNotesWithTimes[midiNotesWithTimesPointer][2]
-      ) {
-        splitParts++
-        midiNotesWithTimesPointer++
+    const animate = (timestamp) => {
+      if (!props.isRecording) return
+
+      const deltaTimeSec = (timestamp - lastFrameTime) / 1000
+      lastFrameTime = timestamp
+
+      const currentTempo = getCurrentTempo(replayTime.value)
+      const beatsPerSecond = currentTempo / 60
+      const beatsThisFrame = deltaTimeSec * beatsPerSecond
+
+      replayTime.value += beatsThisFrame
+
+      const lastNote = notes[notes.length - 1]
+      if (lastNote && replayTime.value >= lastNote.startBeat + lastNote.duration) {
+        emit('stop-replay')
+        cancelAnimationFrame(animationFrameId)
+        replayTime.value = 0
+        return
       }
-
-      let step = Math.floor((end - start + 1) / splitParts)
-      let splitIndexes = []
-
-      for (let s = 0; s < splitParts; s++) {
-        let index = start + Math.floor(step / 2) + s * step
-        if (index <= end) {
-          splitIndexes.push(index)
-        }
-      }
-
-      for (let j = start; j <= end; j++) {
-        if (!splitIndexes.includes(j)) {
-          notes[j].name = ''
-        }
-        mergedNotes.push({ ...notes[j] })
-      }
-
-      return mergedNotes
+      drawStaticNotes()
+      animationFrameId = requestAnimationFrame(animate)
     }
 
     const drawStaticNotes = () => {
       ctx.clearRect(0, 0, canvas.value.width, canvas.value.height)
-      drawPlayhead()
-      for (let i = 1; i * 10 < canvas.value.width; i++) {
+      for (let i = 0; i * 10 < canvas.value.width; i++) {
         drawPlayhead(i)
       }
-      notes = notes.filter((note) => note.x + note.width > firstNotePositionX)
-
       notes.forEach((note) => {
         drawNote(note)
       })
     }
 
     const drawNote = (note) => {
-      ctx.fillStyle = note.isCorrect ? 'green' : 'red'
-      ctx.fillRect(note.x - replayTime.value * pxPerSecond, note.y, note.width, 20)
+      const noteScreenX = note.x - replayTime.value * pxPerBeat
+      const isActive =
+        noteScreenX <= firstNotePositionX && noteScreenX + note.width > firstNotePositionX
+
+      ctx.globalAlpha = isActive ? 1 : 0.5
+      ctx.shadowColor = isActive ? 'rgba(255, 165, 0, 0.8)' : 'transparent'
+      ctx.shadowBlur = isActive ? 10 : 0
+
+      note.timeIndexes.forEach((frameIdx, i) => {
+        const pitchAtFrame = props.recordedNotes[frameIdx]
+
+        ctx.fillStyle = pitchAtFrame === note.pitch ? 'green' : 'red'
+
+        const barWidth = note.width / note.timeIndexes.length
+        ctx.fillRect(noteScreenX + barWidth * i, note.y, barWidth, 20)
+      })
+
       ctx.fillStyle = 'black'
       ctx.font = '14px Arial'
       ctx.textAlign = 'center'
-      ctx.fillText(note.name, note.x - replayTime.value * pxPerSecond + note.width / 2, note.y - 10)
+      ctx.fillText(note.name, noteScreenX + note.width / 2, note.y - 10)
     }
+
     const drawPlayhead = (i = 0) => {
       ctx.strokeStyle = i == 0 ? 'red' : 'grey'
       ctx.lineWidth = i == 0 ? 5 : 0.5
@@ -271,36 +248,11 @@ export default {
       ctx.stroke()
     }
 
-    const animate = () => {
-      if (!props.isReplaying) return
-      ctx.clearRect(0, 0, canvas.value.width, canvas.value.height)
-      drawPlayhead()
-      for (let i = 1; i * 10 < canvas.value.width; i++) {
-        drawPlayhead(i)
-      }
-      notes.forEach((note) => {
-        drawNote(note)
-        note.x -= scrollSpeed
-      })
-
-      notes = notes.filter((note) => note.x + note.width > 0)
-      if (notes.length === 0) {
-        emit('stop-replay')
-        setUpNotes()
-      }
-      animationFrameId = requestAnimationFrame(animate)
-    }
-
     const getYPosition = (midiNote) => {
       return canvas.value.height - (midiNote - minNotePitch + 2) * 10
     }
 
-    /* watch([startBarComputed, endBarComputed], async () => {
-      if (!startBarComputed.value || !endBarComputed.value) return
-      setUpNotes()
-    }) */
-
-    return { canvas, replayTime, totalReplayDuration }
+    return { canvas, replayTime, duration }
   },
 }
 </script>
@@ -322,30 +274,5 @@ export default {
 canvas {
   width: 100%;
   height: 100%;
-}
-.progress-container {
-  width: 100%;
-  margin-top: 10px;
-  display: flex;
-  justify-content: center;
-}
-
-.progress-bar {
-  width: 30%;
-  appearance: none;
-  height: 6px;
-  background: #ccc;
-  border-radius: 3px;
-  outline: none;
-  transition: background 0.3s;
-}
-
-.progress-bar::-webkit-slider-thumb {
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  background: red;
-  border-radius: 50%;
-  cursor: pointer;
 }
 </style>

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 import os
-from midi_utils import get_time_signature, extract_midi_notes_in_range, bars_to_time_range, get_tempo, get_bar_total
+from midi_utils import get_time_signature, extract_midi_notes_in_range, bars_to_time_range, get_tempo, get_bar_info, get_parts
 from audio_utils import record_audio, extract_pitches
 from utils import shutdown_backend
 import threading
@@ -25,8 +25,8 @@ def upload_midi():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
     
-    if file.filename.rsplit(".", 1)[1] != "mid":
-        return jsonify({"error": "Invalid file type. Please upload a MIDI file."}), 400
+    #if file.filename.rsplit(".", 1)[1] != "mid":
+     #   return jsonify({"error": "Invalid file type. Please upload a MIDI file."}), 400
 
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(file_path)
@@ -43,13 +43,13 @@ def record():
         data = request.get_json()
         start_bar = int(data.get("start_bar", 1))
         end_bar = int(data.get("end_bar", 4))
-        tempo = int(data.get("tempo", 120))
+        tempo_multiplier = int(data.get("tempo", 120)) / 100
         
-        start_time, end_time, bpm = bars_to_time_range(MIDI_FILE, start_bar, end_bar)
+        start_time, end_time = bars_to_time_range(MIDI_FILE, start_bar, end_bar, tempo_multiplier)
         DURATION = end_time - start_time
-        DURATION *= bpm / tempo
+        print(DURATION)
         AUDIO = record_audio(duration=DURATION)
-
+        
         return jsonify({"message": "recorded"})
 
     except Exception as e:
@@ -68,19 +68,22 @@ def get_midi_tempo():
     except Exception as e:
         return {"error": str(e)}
     
-@api_routes.get("/get-bar-total")
-def get_midi_bar_total():
+@api_routes.route("/get-bar-info", methods=['POST'])
+def get_midi_bar_info():
     try:
-        return {"bar_total": get_bar_total(MIDI_FILE)}
+        data = request.get_json()
+        part_name = data.get("part_name")
+        return {"bar_info": get_bar_info(MIDI_FILE, part_name)}
     
     except Exception as e:
         return {"error": str(e)}
     
-@api_routes.get("/get-time-signature")
+@api_routes.route("/get-time-signature", methods=['POST'])
 def get_midi_time_signature():
     try:
-        ts_numerator, ts_denominator = get_time_signature(MIDI_FILE)
-        return {"numerator": ts_numerator,"denominator": ts_denominator}
+        data = request.get_json()
+        part_name = data.get("part_name")
+        return {"time_signatures": get_time_signature(MIDI_FILE, part_name)}
     
     except Exception as e:
         return {"error": str(e)}
@@ -92,19 +95,37 @@ def quit():
 
 @api_routes.route("/get-midi-notes", methods=["POST"])
 def get_midi_notes():
-    global MIDI_FILE
-    if not MIDI_FILE:
-        return jsonify({"error": "No MIDI file uploaded"}), 400
-
     try:
         data = request.get_json()
         start_bar = int(data.get("start_bar", 1))
         end_bar = int(data.get("end_bar", 4))
+        part_name = data.get("part_name")
+        midi_notes = extract_midi_notes_in_range(MIDI_FILE, start_bar, end_bar, part_name)
+        
+        return jsonify({"midi_notes": midi_notes})
 
-        start_time, end_time, _ = bars_to_time_range(MIDI_FILE, start_bar, end_bar)
-        midi_notes = extract_midi_notes_in_range(MIDI_FILE, start_time, end_time)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@api_routes.route("/get-midi-start-time-and-duration-from-measures", methods=["POST"])
+def get_midi_start_time_and_duration_from_measures():
+    try:
+        data = request.get_json()
+        start_bar = int(data.get("start_bar", 1))
+        end_bar = int(data.get("end_bar", 4))
+        tempo_multiplier = int(data.get("tempo", 120)) / 100
 
-        return jsonify({"midi_notes": midi_notes.tolist(), "duration": end_time-start_time, "start_time": start_time})
+        start_time, end_time = bars_to_time_range(MIDI_FILE, start_bar, end_bar, tempo_multiplier)
+        
+        return jsonify({"duration": end_time-start_time, "start_time": start_time})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@api_routes.route("/get-parts")
+def get_midi_parts():
+    try:
+        return jsonify({"parts": get_parts(MIDI_FILE)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
