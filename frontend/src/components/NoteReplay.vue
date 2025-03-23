@@ -1,17 +1,26 @@
 <template>
   <div>
-    <div class="visualizer-container">
-      <canvas ref="canvas"></canvas>
+    <div class="replay-controls" v-if="recordedNotes && midiNotes">
+      <button @click="$emit('toggle-replay')">
+        {{ showReplay ? 'Hide replay window' : 'Show replay window' }}
+      </button>
+      <button v-if="!isRecording" @click="$emit('start-replay')">Start replay</button>
+      <button v-if="isRecording" @click="$emit('stop-replay')">Stop replay</button>
     </div>
-    <div class="progress-container">
-      <input
-        type="range"
-        class="progress-bar"
-        min="0"
-        :max="duration"
-        step="0.01"
-        v-model.number="replayTime"
-      />
+    <div v-show="showReplay">
+      <div class="visualizer-container">
+        <canvas ref="canvas"></canvas>
+      </div>
+      <div class="progress-container">
+        <input
+          type="range"
+          class="progress-bar"
+          min="0"
+          :max="duration"
+          step="0.01"
+          v-model.number="replayTime"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -35,8 +44,9 @@ export default {
     tempoMultiplier: [Number, String],
     timeSignatures: Object,
     startTime: Number,
+    showReplay: Boolean,
   },
-  emits: ['stop-replay'],
+  emits: ['stop-replay', 'start-replay', 'toggle-replay'],
   setup(props, { emit }) {
     const canvas = ref(null)
     let ctx = null

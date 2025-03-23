@@ -145,7 +145,7 @@ export default {
       }
       return currentTempo * (props.tempoMultiplier / 100)
     }
-    let lastTempo
+    
     const animate = (timestamp) => {
       if (!props.isRecording) return
 
@@ -169,9 +169,6 @@ export default {
       }
 
       const scrollAmount = beatsThisFrame * pxPerBeat
-
-      //if (lastTempo !== currentTempo) console.log(deltaTimeSec, currentTempo, elapsedBeats)
-      lastTempo = currentTempo
 
       notes.forEach((note) => {
         note.x -= scrollAmount

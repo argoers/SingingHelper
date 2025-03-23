@@ -1,6 +1,11 @@
 <template>
-  <div class="chart-container">
-    <canvas ref="chartCanvas"></canvas>
+  <div>
+    <button @click="$emit('toggle-chart')">
+      {{ showChart ? 'Hide result chart' : 'Show result chart' }}
+    </button>
+    <div class="chart-container" v-show="showChart">
+      <canvas ref="chartCanvas"></canvas>
+    </div>
   </div>
 </template>
 
@@ -39,16 +44,15 @@ export const midiToNote = (midi) => {
 
 export default {
   props: {
-    chartData: {
-      type: Object,
-      required: true,
-    },
+    chartData: Object,
     isRecordingCancelled: Boolean,
+    showChart: Boolean,
   },
+  emits: ['toggle-chart'],
   functions: {
     midiToNote,
   },
-  setup(props) {
+  setup(props, { emit }) {
     const chartCanvas = ref(null)
     let chartInstance = null
 
