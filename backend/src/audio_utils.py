@@ -2,7 +2,7 @@ import sounddevice as sd
 import numpy as np
 import librosa
 
-def record_audio(duration=5, samplerate=44100, mic='default'):
+def record_audio_in_time(duration=5, samplerate=44100, mic='default'):
     try:
         duration += 1 # Add 1 second to account for latency
         audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype="float32")
@@ -12,7 +12,7 @@ def record_audio(duration=5, samplerate=44100, mic='default'):
         print(f"Error recording audio: {e}")
         return np.array([])
 
-def extract_pitches(audio, samplerate=44100, hop_size=256):
+def extract_pitches_from_recorded_audio(audio, samplerate=44100, hop_size=256):
     if audio is None or len(audio) == 0:
         return np.array([])
 

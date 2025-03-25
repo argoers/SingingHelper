@@ -1,20 +1,22 @@
 <template>
-  <div>
-    <div class="replay-controls" v-if="recordedNotes && midiNotes">
+  <div class="card">
+    <h2 class="section-title">Laulmise tulemus</h2>
+
+    <div class="card" v-if="recordedNotes && musicXmlNotesMappedToBeats">
       <button @click="$emit('toggle-replay')">
-        {{ showReplay ? 'Hide replay window' : 'Show replay window' }}
+        {{ showReplay ? 'Peida' : 'Näita' }}
       </button>
-      <button v-if="!isRecording" @click="$emit('start-replay')">Start replay</button>
-      <button v-if="isRecording" @click="$emit('stop-replay')">Stop replay</button>
+      <button v-if="!isRecording" @click="$emit('start-replay')">Käivita</button>
+      <button v-if="isRecording" @click="$emit('stop-replay')">Peata</button>
     </div>
     <div v-show="showReplay">
-      <div class="visualizer-container">
+      <div class="chart-container">
         <canvas ref="canvas"></canvas>
       </div>
-      <div class="progress-container">
+      <div>
         <input
           type="range"
-          class="progress-bar"
+          class="note-highlight"
           min="0"
           :max="duration"
           step="0.01"
@@ -24,25 +26,22 @@
     </div>
   </div>
 </template>
-
 <script lang="js">
 import { ref, onMounted, watch, watchEffect } from 'vue'
-import { midiToNote } from './ChartDisplay.vue'
-import { useWindowSize } from '@vueuse/core'
+import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
 export default {
   props: {
-    midiNotesWithTimes: Object,
-    midiNotes: Object,
+    musicXmlNoteInfo: Object,
+    musicXmlNotesMappedToBeats: Object,
     recordedNotes: Object,
     isRecording: Boolean,
-    tempo: [Number, String],
-    startBar: [Number, String],
-    endBar: [Number, String],
-    tempos: Object,
+    startMeasure: [Number, String],
+    endMeasure: [Number, String],
+    tempoInfo: Object,
     durationInSeconds: Number,
-    tempoMultiplier: [Number, String],
-    timeSignatures: Object,
+    speed: [Number, String],
+    timeSignatureInfo: Object,
     startTime: Number,
     showReplay: Boolean,
   },
@@ -53,28 +52,27 @@ export default {
     let notes = []
     let animationFrameId
     let pxPerBeat = 200
-    let pxPerSecond = pxPerBeat / (60 / props.tempos[0].bpm)
 
     let firstNotePositionX
-    let minNotePitch = Math.min(...props.midiNotesWithTimes.map((e) => e.pitch))
-    let maxNotePitch = Math.max(...props.midiNotesWithTimes.map((e) => e.pitch))
+    let minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
+    let maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
     const replayTime = ref(0)
     const duration = ref(null)
     let lastFrameTime = performance.now()
     let startBeat = 0
-    let startBarOnMount
-    let endBarOnMount
+    let startMeasureOnMount
+    let endMeasureOnMount
 
     onMounted(() => {
-      startBarOnMount = props.startBar
-      endBarOnMount = props.endBar
+      startMeasureOnMount = props.startMeasure
+      endMeasureOnMount = props.endMeasure
       setUpNotes()
     })
 
     watchEffect(() => {
       if (!canvas.value) return
-      canvas.value.width = 0.7 * useWindowSize().width.value
+      canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5)
       firstNotePositionX = canvas.value.height
       console.log('watchEffect')
@@ -88,11 +86,11 @@ export default {
     })
 
     watch(
-      () => props.midiNotes,
+      () => props.musicXmlNotesMappedToBeats,
       () => {
         replayTime.value = 0
-        startBarOnMount = props.startBar
-        endBarOnMount = props.endBar
+        startMeasureOnMount = props.startMeasure
+        endMeasureOnMount = props.endMeasure
         setUpNotes()
       },
     )
@@ -109,87 +107,46 @@ export default {
       },
     )
 
-    const barToBeat = (barNumber, timeSignatures) => {
-      let beats = 0
-      let lastBeatOffset = 0
-      let lastNumerator = 4
-      let lastBarNumber = 0
-
-      for (const ts of timeSignatures) {
-        const tsBeatOffset = ts.offset
-        const tsNumerator = ts.numerator / (ts.denominator / 4)
-
-        const barsBeforeTS = (tsBeatOffset - lastBeatOffset) / lastNumerator
-        const currentBarNumber = lastBarNumber + barsBeforeTS
-
-        if (barNumber < currentBarNumber) break
-
-        beats += (currentBarNumber - lastBarNumber) * lastNumerator
-        lastBeatOffset = tsBeatOffset
-        lastBarNumber = currentBarNumber
-        lastNumerator = tsNumerator
-      }
-
-      beats += (barNumber - lastBarNumber) * lastNumerator
-      return beats
-    }
-
     const setUpNotes = () => {
-      if (!props.midiNotesWithTimes.length) return
+      if (!props.musicXmlNoteInfo.length) return
 
-      minNotePitch = Math.min(...props.midiNotesWithTimes.map((e) => e.pitch))
-      maxNotePitch = Math.max(...props.midiNotesWithTimes.map((e) => e.pitch))
+      minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
+      maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
-      startBeat = barToBeat(startBarOnMount - 1, props.timeSignatures)
-      const endBeat = barToBeat(endBarOnMount, props.timeSignatures)
+      startBeat = getWhichBeatMeasureEndsWith(startMeasureOnMount - 1, props.timeSignatureInfo)
+      const endBeat = getWhichBeatMeasureEndsWith(endMeasureOnMount, props.timeSignatureInfo)
 
-      canvas.value.width = 0.7 * useWindowSize().width.value
+      canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5)
       firstNotePositionX = canvas.value.height
-      const splitLength = props.durationInSeconds / props.midiNotes.length
+      const splitLength = props.durationInSeconds / props.musicXmlNotesMappedToBeats.length
 
       ctx = canvas.value.getContext('2d')
 
-      notes = props.midiNotesWithTimes.map((note, i) => {
-        const timeIndexes = props.midiNotes
+      notes = props.musicXmlNoteInfo.map((note, i) => {
+        const timeIndexes = props.musicXmlNotesMappedToBeats
           .map((_, i) => i)
           .filter((i) => {
             const time = i * splitLength + props.startTime
-            return (
-              time >= note.start / (props.tempoMultiplier / 100) &&
-              time <= note.end / (props.tempoMultiplier / 100)
-            )
+            return time >= note.start / props.speed && time <= note.end / props.speed
           })
         return {
           pitch: note.pitch,
           x: firstNotePositionX + (note.offset - startBeat) * pxPerBeat,
-          y: getYPosition(note.pitch),
+          y: getYPosition(note.pitch, minNotePitch, canvas.value.height),
           width: note.duration * pxPerBeat,
-          name: midiToNote(note.pitch),
+          name: note.name,
           startBeat: note.offset,
           startTime: note.start,
           duration: note.duration,
           timeIndexes: timeIndexes,
         }
       })
-
+      console.log(notes)
       notes = notes.filter((e) => e.timeIndexes.length > 0 && e.x + e.width > firstNotePositionX)
       duration.value = endBeat - startBeat
 
       drawStaticNotes()
-    }
-
-    const getCurrentTempo = (beat) => {
-      const absoluteBeat = beat + startBeat
-      let currentTempo = props.tempos[0].bpm
-      for (const t of props.tempos) {
-        if (absoluteBeat >= t.offset) {
-          currentTempo = t.bpm
-        } else {
-          break
-        }
-      }
-      return currentTempo * (props.tempoMultiplier / 100)
     }
 
     const animate = (timestamp) => {
@@ -198,7 +155,12 @@ export default {
       const deltaTimeSec = (timestamp - lastFrameTime) / 1000
       lastFrameTime = timestamp
 
-      const currentTempo = getCurrentTempo(replayTime.value)
+      const currentTempo = getCurrentTempo(
+        replayTime.value,
+        props.tempoInfo,
+        props.speed,
+        props.startMeasure,
+      )
       const beatsPerSecond = currentTempo / 60
       const beatsThisFrame = deltaTimeSec * beatsPerSecond
 
@@ -258,31 +220,9 @@ export default {
       ctx.stroke()
     }
 
-    const getYPosition = (midiNote) => {
-      return canvas.value.height - (midiNote - minNotePitch + 2) * 10
-    }
-
     return { canvas, replayTime, duration }
   },
 }
 </script>
 
-<style scoped>
-.visualizer-container {
-  width: 70%;
-  height: 100%;
-  border: 1px solid black;
-  overflow: hidden;
-  background-color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: auto;
-  margin-top: 50px;
-}
-
-canvas {
-  width: 100%;
-  height: 100%;
-}
-</style>
+<style scoped></style>

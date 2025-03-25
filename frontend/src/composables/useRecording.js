@@ -1,20 +1,20 @@
-// composables/useRecording.js
 import { ref } from 'vue'
 import {
   recordAudio,
-  extractPitchesFromAudio,
-  getMidiStartTimeAndDurationFromMeasures,
+  extractPitchesFromRecordedAudio,
+  getMusicXmlStartTimeAndDurationInSeconds,
 } from '@/services/api'
 
 export function useRecording({
-  startBar,
-  endBar,
-  tempo,
+  startMeasure,
+  endMeasure,
+  speed,
   chartData,
-  midiNotes,
-  barsInfo,
-  timeSignatures,
-  tempos,
+  musicXmlNoteInfo,
+  measureInfo,
+  timeSignatureInfo,
+  tempoInfo,
+  selectedPart,
   playClickSound,
   playMetronome,
   stopMetronome,
@@ -32,8 +32,8 @@ export function useRecording({
   const showReplay = ref(false)
   const isReplaying = ref(false)
 
-  const loadingRecordingMessage = ref('Sing now!')
-  const loadingProcessingMessage = ref('Processing audio')
+  const loadingRecordingMessage = ref('Laula!')
+  const loadingProcessingMessage = ref('Loen sisse salvestuse infot')
   const errorMessage = ref('')
 
   let requestSession = 0
@@ -45,23 +45,25 @@ export function useRecording({
     isRecordingCancelled.value = false
     errorMessage.value = ''
     isInCountdown.value = true
-
-    const barStartBeat = barsInfo.value.find(b => b.bar === startBar.value)?.start_beat ?? 0
-    const applicableTS = [...timeSignatures.value].reverse().find(ts => ts.offset <= barStartBeat)
-    const applicableTempo = [...tempos.value].reverse().find(t => t.offset <= barStartBeat)
+    
+    const measureStartBeat = measureInfo.value.find(b => b.measure === startMeasure.value).start_beat
+    const applicableTS = timeSignatureInfo.value.find(ts => ts.offset <= measureStartBeat)
+    const applicableTempo = tempoInfo.value.find(t => t.offset <= measureStartBeat)
 
     const bpm = applicableTempo.bpm
     const beats = applicableTS.numerator
-    const speedMultiplier = tempo.value / 100
-    const clickInterval = 60 / bpm / speedMultiplier
+    const clickInterval = 60 / bpm / speed.value
     const totalCountTime = beats * clickInterval
 
     countdown.value = beats
     let elapsedTime = 0
     let hasStartedRecording = false
 
-    while (true) {
+    while (true) {      
       const timeRemaining = totalCountTime - elapsedTime
+      if (countdown.value >= 0) {
+        console.log(timeRemaining, totalCountTime, elapsedTime)
+      }
       if (!hasStartedRecording && timeRemaining <= 1.0) {
         startRecordingAudio(currentSession)
         hasStartedRecording = true
@@ -81,7 +83,7 @@ export function useRecording({
 
   const startRecordingAudio = async (currentSession) => {
     try {
-      await recordAudio(startBar.value, endBar.value, tempo.value)
+      await recordAudio(startMeasure.value, endMeasure.value, speed.value, selectedPart.value)
     } catch (err) {
       setError(err.message)
       return
@@ -93,46 +95,46 @@ export function useRecording({
     isProcessingAudio.value = true
 
     try {
-      const data = await extractPitchesFromAudio(startBar.value, endBar.value)
+      const data = await extractPitchesFromRecordedAudio(startMeasure.value, endMeasure.value)
       if (currentSession === requestSession && !isRecordingCancelled.value) {
         chartData.value.datasets[1].data = data.liveNotes
         isProcessingAudio.value = false
 
-        const timeData = await getMidiStartTimeAndDurationFromMeasures(
-          startBar.value, endBar.value, tempo.value
+        const timeData = await getMusicXmlStartTimeAndDurationInSeconds(
+          startMeasure.value, endMeasure.value, speed.value, selectedPart.value
         )
         setDuration(timeData.duration)
         setStartTime(timeData.start_time)
 
         const numPoints = data.liveNotes.length
-        const beatStart = barsInfo.value[startBar.value - 1].start_beat
-        const beatEnd = barsInfo.value[endBar.value - 1].start_beat + barsInfo.value[endBar.value - 1].duration_beats
+        const beatStart = measureInfo.value[startMeasure.value - 1].start_beat
+        const beatEnd = measureInfo.value[endMeasure.value - 1].start_beat + measureInfo.value[endMeasure.value - 1].duration_beats
         const beatStep = (beatEnd - beatStart) / numPoints
         const beatAxis = Array.from({ length: numPoints }, (_, i) => beatStart + i * beatStep)
 
-        const beatToBar = (t) => {
-          let bar = startBar.value
-          for (let i = 1; i < barsInfo.value.length; i++) {
-            if (t < barsInfo.value[i].start_beat) break
-            bar = barsInfo.value[i].bar
+        const getWhichMeasureIsBeatIn = (t) => {
+          let measure = startMeasure.value
+          for (let i = 1; i < measureInfo.value.length; i++) {
+            if (t < measureInfo.value[i].start_beat) break
+            measure = measureInfo.value[i].measure
           }
-          return bar
+          return measure
         }
 
         const labels = beatAxis.map((t, i) => {
-          const bar = beatToBar(t)
-          const prevBar = i > 0 ? beatToBar(beatAxis[i - 1]) : null
-          return bar !== prevBar ? `Bar ${bar}` : ''
+          const measure = getWhichMeasureIsBeatIn(t)
+          const previousMeasure = i > 0 ? getWhichMeasureIsBeatIn(beatAxis[i - 1]) : null
+          return measure !== previousMeasure ? `Takt ${measure}` : ''
         })
 
-        const midiMapped = beatAxis.map((t) => {
-          const note = midiNotes.value.find(
+        const musicXmlNotesMappedToBeats = beatAxis.map((t) => {
+          const note = musicXmlNoteInfo.value.find(
             (n) => n.offset <= t && t <= n.offset + n.duration
           )
           return note ? note.pitch : null
         })
 
-        chartData.value.datasets[0].data = midiMapped
+        chartData.value.datasets[0].data = musicXmlNotesMappedToBeats
         chartData.value.labels = labels
         showChart.value = true
         showReplay.value = true
@@ -173,11 +175,11 @@ export function useRecording({
 
 /*
             function timeToBar(t) {
-              let currentBar = barsInfo.value[startBar.value - 1].bar
-              for (let i = 1; i < barsInfo.value.length; i++) {
-                //console.log(t, barsInfo.value[i].start_time / (tempo.value / 100))
-                if (t < barsInfo.value[i].start_time / (tempo.value / 100)) break
-                currentBar = barsInfo.value[i].bar
+              let currentBar = measureInfo.value[startMeasure.value - 1].measure
+              for (let i = 1; i < measureInfo.value.length; i++) {
+                //console.log(t, measureInfo.value[i].start_time / (speed.value / 100))
+                if (t < measureInfo.value[i].start_time / (speed.value / 100)) break
+                currentBar = measureInfo.value[i].measure
               }
               return currentBar
             }
@@ -189,14 +191,14 @@ export function useRecording({
 
             const labels = timeAxis.map((t, i) => {
               const currentBar = timeToBar(t)
-              const prevBar = i > 0 ? timeToBar(timeAxis[i - 1]) : null
-              return currentBar !== prevBar ? `Bar ${currentBar}` : ''
+              const previousMeasure = i > 0 ? timeToBar(timeAxis[i - 1]) : null
+              return currentBar !== previousMeasure ? `Bar ${currentBar}` : ''
             })
 
-            const midiMapped = timeAxis.map((t) => {
-              const activeNote = midiNotes.value.find(
+            const musicXmlNotesMappedToBeats = timeAxis.map((t) => {
+              const activeNote = musicXmlNoteInfo.value.find(
                 (note) =>
-                  note.start / (tempo.value / 100) <= t && t <= note.end / (tempo.value / 100),
+                  note.start / (speed.value / 100) <= t && t <= note.end / (speed.value / 100),
               )
               return activeNote ? activeNote.pitch : null
             })

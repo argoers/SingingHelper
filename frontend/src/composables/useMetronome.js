@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import metronomeSound from '@/assets/metronome.mp3'
 
-export function useMetronome(timeSignatures, tempos, tempo, barsInfo) {
+export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
   const metronomeInterval = ref(null)
   const metronomeAudio = new Audio(metronomeSound)
   metronomeAudio.load()
@@ -12,7 +12,7 @@ export function useMetronome(timeSignatures, tempos, tempo, barsInfo) {
     metronomeAudio.play()
   }
 
-  const playMetronome = (startBar) => {
+  const playMetronome = (startMeasure) => {
     stopMetronome()
 
     let beatIndex = 0
@@ -21,12 +21,12 @@ export function useMetronome(timeSignatures, tempos, tempo, barsInfo) {
     let tempoIndex = 0
     let lastTime = performance.now()
 
-    const barStartBeat = barsInfo.value.find((b) => b.bar === startBar)?.start_beat ?? 0
-    let applicableTS = timeSignatures.value.find(ts => ts.offset <= barStartBeat) || timeSignatures.value[0]
-    let applicableTempo = tempos.value.find(t => t.offset <= barStartBeat) || tempos.value[0]
+    const measureStartBeat = measureInfo.value.find((m) => m.measure === startMeasure).start_beat
+    let applicableTS = timeSignatureInfo.value.find(ts => ts.offset <= measureStartBeat)
+    let applicableTempo = tempoInfo.value.find(t => t.offset <= measureStartBeat)
 
-    let beatsPerBar = applicableTS.numerator
-    let bpm = applicableTempo.bpm / (tempo.value / 100)
+    let beatsPerMeasure = applicableTS.numerator
+    let bpm = applicableTempo.bpm / speed.value
     let secondsPerBeat = 60 / bpm
 
     const playNextBeat = () => {
@@ -35,21 +35,21 @@ export function useMetronome(timeSignatures, tempos, tempo, barsInfo) {
       lastTime = now
       currentOffset += elapsed / secondsPerBeat
 
-      // Update time signature and tempo
-      while (timeSignatureIndex < timeSignatures.value.length &&
-             timeSignatures.value[timeSignatureIndex].offset <= currentOffset) {
-        beatsPerBar = timeSignatures.value[timeSignatureIndex].numerator
+      // Update time signature and speed
+      while (timeSignatureIndex < timeSignatureInfo.value.length &&
+             timeSignatureInfo.value[timeSignatureIndex].offset <= currentOffset) {
+        beatsPerMeasure = timeSignatureInfo.value[timeSignatureIndex].numerator
         timeSignatureIndex++
       }
 
-      while (tempoIndex < tempos.value.length &&
-             tempos.value[tempoIndex].offset <= currentOffset) {
-        bpm = tempos.value[tempoIndex].bpm / (tempo.value / 100)
+      while (tempoIndex < tempoInfo.value.length &&
+             tempoInfo.value[tempoIndex].offset <= currentOffset) {
+        bpm = tempoInfo.value[tempoIndex].bpm / speed.value
         secondsPerBeat = 60 / bpm
         tempoIndex++
       }
 
-      const isStrongBeat = beatIndex % beatsPerBar === 0
+      const isStrongBeat = beatIndex % beatsPerMeasure === 0
       playClickSound(isStrongBeat)
       beatIndex++
 

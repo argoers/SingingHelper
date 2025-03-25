@@ -1,86 +1,85 @@
 <template>
-  <button v-if="!applicationQuitted" @click="stopServers" class="stop-button">
-    Quit Application
-  </button>
-  <p v-if="applicationQuitted">Close the tab/window</p>
+  <button v-if="!applicationQuitted" @click="stopServers" class="button">Sulge rakendus</button>
+  <p v-if="applicationQuitted">Sulge aken</p>
   <div v-if="!applicationQuitted" class="container">
-    <h2>Compare MIDI & Singing</h2>
+    <h2>MusicXML faili ja laulmise võrdlus</h2>
 
-    <div class="upload-section">
+    <div class="card">
       <FileUpload
         @file-uploaded="handleFileUploaded"
         :isRecordingProcessActive="isInCountdown || isRecording || isProcessingAudio"
       />
       <p v-if="selectedFile">
-        Selected file: <b>{{ selectedFile }}</b>
+        Fail: <b>{{ selectedFile }}</b>
       </p>
+      <div v-if="fileUploaded">
+        <label for="partSelect">Partii:</label>
+        <select id="partSelect" v-model="selectedPart" @change="fetchNotes">
+          <option v-for="part in parts" :key="part" :value="part">{{ part }}</option>
+        </select>
+      </div>
     </div>
 
-    <div v-if="fileUploaded">
-      <label for="partSelect">Select Part:</label>
-      <select id="partSelect" v-model="selectedPart" @change="fetchNotes">
-        <option v-for="part in parts" :key="part" :value="part">{{ part }}</option>
-      </select>
-    </div>
-
-    <BarSelection
-      :selectedPart="selectedPart"
-      :disabled="isInCountdown || isRecording || isProcessingAudio"
-      :totalBars="totalBars"
-      v-model:startBar="startBar"
-      v-model:endBar="endBar"
-      v-model:tempo="tempo"
-    />
-
-    <label v-if="selectedPart">
-      <input
-        type="checkbox"
-        v-model="isMetronomeEnabled"
+    <div class="card" v-show="selectedPart">
+      <MeasureAndSpeedSelection
+        :selectedPart="selectedPart"
         :disabled="isInCountdown || isRecording || isProcessingAudio"
+        :totalMeasures="totalMeasures"
+        v-model:startMeasure="startMeasure"
+        v-model:endMeasure="endMeasure"
+        v-model:speed="speed"
       />
-      Do you want to use the metronome?
-    </label>
 
-    <RecordingControls
-      :selectedPart="selectedPart"
-      :isRecording="isRecording"
-      :isProcessingAudio="isProcessingAudio"
-      :isNoteBeingPlayed="isNoteBeingPlayed"
-      :isInCountdown="isInCountdown"
-      :countdown="countdown"
-      :disabled="isInCountdown || isRecording || isProcessingAudio"
-      @start-recording="startRecordingProcess"
-      @cancel-recording="cancelRecordingProcess"
-      @play-first-note="playFirstNote"
-    />
+      <label v-if="selectedPart">
+        <input
+          type="checkbox"
+          v-model="isMetronomeEnabled"
+          :disabled="isInCountdown || isRecording || isProcessingAudio"
+        />
+        Metronoom
+      </label>
+    </div>
 
-    <p v-if="isRecording">{{ loadingRecordingMessage }}</p>
-    <p v-if="isProcessingAudio">{{ loadingProcessingMessage }}</p>
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+    <div class="card" v-show="selectedPart">
+      <RecordingControls
+        :selectedPart="selectedPart"
+        :isRecording="isRecording"
+        :isProcessingAudio="isProcessingAudio"
+        :isNoteBeingPlayed="isNoteBeingPlayed"
+        :isInCountdown="isInCountdown"
+        :countdown="countdown"
+        :disabled="isInCountdown || isRecording || isProcessingAudio"
+        @start-recording="startRecordingProcess"
+        @cancel-recording="cancelRecordingProcess"
+        @play-first-note="playFirstNote"
+      />
 
-    <NoteVisualization
-      v-if="midiNotes"
-      :midiNotes="midiNotes"
-      :isRecording="isRecording"
-      :tempoMultiplier="tempo"
-      :startBar="startBar"
-      :endBar="endBar"
-      :tempos="tempos"
-      :timeSignatures="timeSignatures"
-    />
+      <p v-if="isRecording">{{ loadingRecordingMessage }}</p>
+      <p v-if="isProcessingAudio">{{ loadingProcessingMessage }}</p>
+      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
+      <NoteVisualization
+        v-if="musicXmlNoteInfo"
+        :musicXmlNoteInfo="musicXmlNoteInfo"
+        :isRecording="isRecording"
+        :speed="speed"
+        :startMeasure="startMeasure"
+        :endMeasure="endMeasure"
+        :tempoInfo="tempoInfo"
+        :timeSignatureInfo="timeSignatureInfo"
+      />
+    </div>
     <NoteReplay
       v-if="chartData.datasets[1].data && chartData.datasets[0].data"
-      :midiNotesWithTimes="midiNotes"
-      :midiNotes="chartData.datasets[0].data"
+      :musicXmlNoteInfo="musicXmlNoteInfo"
+      :musicXmlNotesMappedToBeats="chartData.datasets[0].data"
       :recordedNotes="chartData.datasets[1].data"
       :isRecording="isReplaying"
-      :tempo="tempo"
-      :tempoMultiplier="tempo"
-      :startBar="startBar"
-      :endBar="endBar"
-      :tempos="tempos"
-      :timeSignatures="timeSignatures"
+      :speed="speed"
+      :startMeasure="startMeasure"
+      :endMeasure="endMeasure"
+      :tempoInfo="tempoInfo"
+      :timeSignatureInfo="timeSignatureInfo"
       :durationInSeconds="duration"
       :startTime="startTime"
       :showReplay="showReplay"
@@ -108,14 +107,14 @@ import NoteReplay from './components/NoteReplay.vue'
 import { useMetronome } from '@/composables/useMetronome'
 import { useRecording } from '@/composables/useRecording'
 import { useNotePlayback } from '@/composables/useNotePlayback'
-import BarSelection from './components/BarSelection.vue'
+import MeasureAndSpeedSelection from './components/MeasureAndSpeedSelection.vue'
 import RecordingControls from './components/RecordingControls.vue'
 import {
-  getMidiNotes,
-  getParts,
-  getTempo,
-  getBarInfo,
-  getTimeSignature,
+  getMusicXmlNoteInfo,
+  getPartNames,
+  getTempoInfo,
+  getMeasureInfo,
+  getTimeSignatureInfo,
   quitApplication,
 } from './services/api'
 
@@ -125,7 +124,7 @@ export default {
     ChartDisplay,
     NoteVisualization,
     NoteReplay,
-    BarSelection,
+    MeasureAndSpeedSelection,
     RecordingControls,
   },
   setup() {
@@ -142,10 +141,10 @@ export default {
 
     const isMetronomeEnabled = ref(false)
     const fileUploaded = ref(false)
-    const startBar = ref(1)
-    const endBar = ref(1)
-    const tempo = ref(100)
-    const totalBars = ref(null)
+    const startMeasure = ref(1)
+    const endMeasure = ref(1)
+    const speed = ref(100)
+    const totalMeasures = ref(null)
     const selectedFile = ref('')
     const chartData = ref({
       labels: [],
@@ -170,23 +169,22 @@ export default {
     })
     const parts = ref([])
     const selectedPart = ref(null)
-    const timeSignatures = ref([])
-    const tempos = ref([])
-    const barsInfo = ref(null)
-    const defaultTempo = ref(null)
-    const midiNotes = ref(null)
+    const timeSignatureInfo = ref([])
+    const tempoInfo = ref([])
+    const measureInfo = ref(null)
+    const musicXmlNoteInfo = ref(null)
     const startTime = ref(null)
     const duration = ref(null)
 
     const { playMetronome, stopMetronome, playClickSound } = useMetronome(
-      timeSignatures,
-      tempos,
-      tempo,
-      barsInfo,
+      timeSignatureInfo,
+      tempoInfo,
+      speed,
+      measureInfo,
       isMetronomeEnabled,
     )
 
-    const { isNoteBeingPlayed, playFirstNote } = useNotePlayback(midiNotes)
+    const { isNoteBeingPlayed, playFirstNote } = useNotePlayback(musicXmlNoteInfo)
 
     const {
       isInCountdown,
@@ -206,14 +204,15 @@ export default {
       enableReplay,
       startReplay,
     } = useRecording({
-      startBar,
-      endBar,
-      tempo,
+      startMeasure,
+      endMeasure,
+      speed,
       chartData,
-      midiNotes,
-      barsInfo,
-      timeSignatures,
-      tempos,
+      musicXmlNoteInfo,
+      measureInfo,
+      timeSignatureInfo,
+      tempoInfo,
+      selectedPart,
       playClickSound,
       playMetronome,
       stopMetronome,
@@ -225,30 +224,33 @@ export default {
 
     const fetchNotes = async () => {
       try {
-        const response = await getBarInfo(selectedPart.value)
-        barsInfo.value = response.bar_info
-        const lastBar = barsInfo.value[barsInfo.value.length - 1].bar
-        endBar.value = lastBar
-        totalBars.value = lastBar
+        const response = await getMeasureInfo(selectedPart.value)
+        measureInfo.value = response.measure_info
+        const lastMeasure = measureInfo.value[measureInfo.value.length - 1].measure
+        endMeasure.value = lastMeasure
+        totalMeasures.value = lastMeasure
       } catch (error) {
         errorMessage.value = error.message
       }
       try {
-        const response = await getTimeSignature(selectedPart.value)
-        timeSignatures.value = response.time_signatures
+        const response = await getTimeSignatureInfo(selectedPart.value)
+        timeSignatureInfo.value = response.time_signature_info
       } catch (error) {
         errorMessage.value = error.message
       }
       try {
-        const response = await getTempo()
-        tempos.value = response.tempo
-        defaultTempo.value = 100
+        const response = await getTempoInfo(selectedPart.value)
+        tempoInfo.value = response.tempo_info
       } catch (error) {
         errorMessage.value = error.message
       }
       try {
-        const response = await getMidiNotes(startBar.value, endBar.value, selectedPart.value)
-        midiNotes.value = response.midi_notes
+        const response = await getMusicXmlNoteInfo(
+          startMeasure.value,
+          endMeasure.value,
+          selectedPart.value,
+        )
+        musicXmlNoteInfo.value = response.note_info
       } catch (error) {
         errorMessage.value = error.message
       }
@@ -257,7 +259,7 @@ export default {
     const handleFileUploaded = async (success) => {
       fileUploaded.value = success
       if (!success) {
-        errorMessage.value = 'Select a MIDI file!'
+        errorMessage.value = 'Vali MusicXML fail!'
         chartData.value.labels = {}
         chartData.value.datasets[0].data = null
         chartData.value.datasets[1].data = null
@@ -266,9 +268,9 @@ export default {
       chartData.value.labels = {}
       chartData.value.datasets[0].data = null
       chartData.value.datasets[1].data = null
-      startBar.value = 1
+      startMeasure.value = 1
       try {
-        const response = await getParts()
+        const response = await getPartNames()
         parts.value = response.parts
       } catch (error) {
         errorMessage.value = error.message
@@ -284,10 +286,10 @@ export default {
       parts,
       selectedPart,
       fetchNotes,
-      startBar,
-      endBar,
-      tempo,
-      totalBars,
+      startMeasure,
+      endMeasure,
+      speed,
+      totalMeasures,
       isMetronomeEnabled,
       playFirstNote,
       isNoteBeingPlayed,
@@ -308,10 +310,10 @@ export default {
       isReplaying,
       loadingRecordingMessage,
       loadingProcessingMessage,
-      midiNotes,
-      timeSignatures,
-      tempos,
-      barsInfo,
+      musicXmlNoteInfo,
+      timeSignatureInfo,
+      tempoInfo,
+      measureInfo,
       startTime,
       duration,
     }
@@ -319,41 +321,4 @@ export default {
 }
 </script>
 
-<style scoped>
-.container {
-  text-align: center;
-  max-width: 100%;
-  margin: auto;
-}
-
-.upload-section {
-  margin-bottom: 10px;
-}
-
-.bar-selection {
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-}
-
-button {
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
-  border-radius: 5px;
-}
-
-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.error {
-  color: red;
-  font-weight: bold;
-}
-</style>
+<style scoped></style>

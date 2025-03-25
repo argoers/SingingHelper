@@ -1,7 +1,6 @@
 flask
 flask-cors
 numpy
-pretty_midi
 librosa
 sounddevice
 pyinstaller

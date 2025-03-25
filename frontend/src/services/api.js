@@ -1,11 +1,11 @@
 const API_BASE_URL = "http://127.0.0.1:5001";
 
-export const uploadFile = async (file) => {
+export const uploadMusicXml = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/upload-midi`, {
+    const response = await fetch(`${API_BASE_URL}/upload-musicXml`, {
       method: "POST",
       body: formData,
     });
@@ -25,11 +25,11 @@ export const uploadFile = async (file) => {
   }
 };
 
-export const getMidiStartTimeAndDurationFromMeasures = async (startBar, endBar, tempo) => {
-  const response = await fetch(`${API_BASE_URL}/get-midi-start-time-and-duration-from-measures`, {
+export const getMusicXmlStartTimeAndDurationInSeconds = async (startMeasure, endMeasure, speed, partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-start-time-and-duration-in-seconds`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo }),
+    body: JSON.stringify({ start_measure: startMeasure, end_measure: endMeasure, speed: speed, part_name: partName }),
   });
 
   if (!response.ok) {
@@ -39,11 +39,11 @@ export const getMidiStartTimeAndDurationFromMeasures = async (startBar, endBar, 
   return await response.json();
 };
 
-export const getMidiNotes = async (startBar, endBar, partName) => {
-  const response = await fetch(`${API_BASE_URL}/get-midi-notes`, {
+export const getMusicXmlNoteInfo = async (startMeasure, endMeasure, partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-note-info`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ start_bar: startBar, end_bar: endBar, part_name: partName }),
+    body: JSON.stringify({ start_measure: startMeasure, end_measure: endMeasure, part_name: partName }),
   });
 
   if (!response.ok) {
@@ -53,9 +53,9 @@ export const getMidiNotes = async (startBar, endBar, partName) => {
   return await response.json();
 };
 
-export const extractPitchesFromAudio = async (startBar, endBar) => {
+export const extractPitchesFromRecordedAudio = async (startMeasure, endMeasure) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/extract`);
+    const response = await fetch(`${API_BASE_URL}/extract-pitches-from-recorded-audio`);
 
     const data = await response.json();
 
@@ -75,7 +75,7 @@ export const extractPitchesFromAudio = async (startBar, endBar) => {
     }
 
     let numPoints = livePitches.length;
-    const numBars = endBar - startBar + 1;
+    const numBars = endMeasure - startMeasure + 1;
 
     while (numPoints % numBars !== 0) {
       numPoints += 1;
@@ -95,12 +95,12 @@ export const extractPitchesFromAudio = async (startBar, endBar) => {
   }
 }
 
-export const recordAudio = async (startBar, endBar, tempo) => {
+export const recordAudio = async (startMeasure, endMeasure, speed, partName) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/record`, {
+    const response = await fetch(`${API_BASE_URL}/record-audio`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_bar: startBar, end_bar: endBar, tempo: tempo}),
+      body: JSON.stringify({ start_measure: startMeasure, end_measure: endMeasure, speed: speed, part_name: partName}),
     });
 
     const data = await response.json();
@@ -115,29 +115,34 @@ export const recordAudio = async (startBar, endBar, tempo) => {
   }
 };
 
-export const getTempo = async () => {
-  const response = await fetch(`${API_BASE_URL}/get-tempo`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch tempo.");
-  }
-  return await response.json();
-};
-
-export const getBarInfo = async (partName) => {
-  const response = await fetch(`${API_BASE_URL}/get-bar-info`, {
+export const getTempoInfo = async (partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-tempo-info`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ part_name: partName }),
   });
   
   if (!response.ok) {
-    throw new Error("Failed to fetch bar range.");
+    throw new Error("Failed to fetch tempo info.");
   }
   return await response.json();
 };
 
-export const getTimeSignature = async (partName) => {
-  const response = await fetch(`${API_BASE_URL}/get-time-signature`, {
+export const getMeasureInfo = async (partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-measure-info`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ part_name: partName }),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch measure info.");
+  }
+  return await response.json();
+};
+
+export const getTimeSignatureInfo = async (partName) => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-time-signature-info`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ part_name: partName }),
@@ -150,15 +155,15 @@ export const getTimeSignature = async (partName) => {
 };
 
 export const quitApplication = async () => {
-  const response = await fetch(`${API_BASE_URL}/quit`);
+  const response = await fetch(`${API_BASE_URL}/quit-application`);
   if (!response.ok) {
     throw new Error("Failed to fetch time signature.");
   }
   return await response.json();
 };
 
-export const getParts = async () => {
-  const response = await fetch(`${API_BASE_URL}/get-parts`);
+export const getPartNames = async () => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-part-names`);
   if (!response.ok) {
     throw new Error("Failed to fetch part names.");
   }

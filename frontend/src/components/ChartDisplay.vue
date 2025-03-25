@@ -1,8 +1,12 @@
 <template>
-  <div>
-    <button @click="$emit('toggle-chart')">
-      {{ showChart ? 'Hide result chart' : 'Show result chart' }}
-    </button>
+  <div class="card">
+    <h2 class="section-title">Laulmise graafik takti kaupa</h2>
+
+    <div class="card">
+      <button @click="$emit('toggle-chart')">
+        {{ showChart ? 'Peida' : 'Näita' }}
+      </button>
+    </div>
     <div class="chart-container" v-show="showChart">
       <canvas ref="chartCanvas"></canvas>
     </div>
@@ -34,14 +38,6 @@ ChartJS.register(
   CategoryScale,
 )
 
-export const midiToNote = (midi) => {
-  if (midi === null || midi < 0) return ''
-  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-  const octave = Math.floor(midi / 12) - 1
-  const note = noteNames[midi % 12]
-  return `${note}${octave}`
-}
-
 export default {
   props: {
     chartData: Object,
@@ -49,9 +45,6 @@ export default {
     showChart: Boolean,
   },
   emits: ['toggle-chart'],
-  functions: {
-    midiToNote,
-  },
   setup(props, { emit }) {
     const chartCanvas = ref(null)
     let chartInstance = null
@@ -63,6 +56,7 @@ export default {
       if (!allPitches) return
       chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 1
       chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 1
+      chartCanvas.value.height = (chartOptions.scales.y.max - chartOptions.scales.y.min) * 50
     }
 
     const chartOptions = {
@@ -89,7 +83,7 @@ export default {
           ticks: {
             autoSkip: false,
             stepSize: 1,
-            callback: (value) => midiToNote(value),
+            callback: (value) => midiPitchToNoteWithOctave(value),
           },
         },
       },
@@ -109,6 +103,14 @@ export default {
       })
     }
 
+    const midiPitchToNoteWithOctave = (midi) => {
+      if (midi === null || midi < 0) return ''
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+      const octave = Math.floor(midi / 12) - 1
+      const note = noteNames[midi % 12]
+      return `${note}${octave}`
+    }
+
     onMounted(() => {
       createChart()
     })
@@ -122,19 +124,4 @@ export default {
 }
 </script>
 
-<style scoped>
-.chart-container {
-  width: 70%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: auto;
-  margin-top: 50px;
-}
-
-canvas {
-  width: 100%;
-  height: 100%;
-}
-</style>
+<style scoped></style>

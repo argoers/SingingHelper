@@ -1,16 +1,17 @@
 <template>
-  <div class="file-upload">
-    <input type="file" ref="fileInput" @change="handleFileUpload" hidden />
-    <button :disabled="isRecordingProcessActive" @click="openFileDialog">
-      Upload your MIDI File
-    </button>
-    <p v-if="selectedFile">Selected file: {{ selectedFile.name }}</p>
+  <div>
+    <h2 class="section-title">Soovitud partii sisselaulmiseks</h2>
+    <div class="card">
+      <input type="file" ref="fileInput" @change="handleFileUpload" hidden />
+      <button :disabled="isRecordingProcessActive" @click="openFileDialog">Vali</button>
+      <p v-if="selectedFile">Fail: {{ selectedFile.name }}</p>
+    </div>
   </div>
 </template>
 
 <script lang="js">
 import { ref } from 'vue'
-import { uploadFile } from '../services/api'
+import { uploadMusicXml } from '../services/api'
 
 export default {
   props: {
@@ -29,7 +30,7 @@ export default {
       const file = event.target.files[0]
       if (!file) return
 
-      const success = await uploadFile(file)
+      const success = await uploadMusicXml(file)
 
       if (!success) {
         selectedFile.value = null
@@ -44,18 +45,3 @@ export default {
   },
 }
 </script>
-
-<style scoped>
-.file-upload button {
-  background-color: #008cba;
-  color: white;
-  padding: 10px 15px;
-  cursor: pointer;
-  border-radius: 5px;
-}
-
-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-</style>

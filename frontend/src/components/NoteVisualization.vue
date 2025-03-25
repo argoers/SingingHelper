@@ -1,24 +1,22 @@
 <template>
-  <div class="visualizer-container">
+  <div class="chart-container">
     <canvas ref="canvas"></canvas>
   </div>
 </template>
 
 <script lang="js">
 import { ref, onMounted, watch, watchEffect } from 'vue'
-import { midiToNote } from './ChartDisplay.vue'
-import { useWindowSize } from '@vueuse/core'
+import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
 export default {
   props: {
-    midiNotes: Object,
+    musicXmlNoteInfo: Object,
     isRecording: Boolean,
-    tempo: [Number, String],
-    startBar: [Number, String],
-    endBar: [Number, String],
-    tempos: Object,
-    timeSignatures: Object,
-    tempoMultiplier: [Number, String],
+    speed: [Number, String],
+    startMeasure: [Number, String],
+    endMeasure: [Number, String],
+    tempoInfo: Object,
+    timeSignatureInfo: Object,
   },
   setup(props) {
     const canvas = ref(null)
@@ -28,9 +26,8 @@ export default {
     let pxPerBeat = 200
 
     let firstNotePositionX
-    let lastNotePositionX
-    let minNotePitch = Math.min(...props.midiNotes.map((e) => e.pitch))
-    let maxNotePitch = Math.max(...props.midiNotes.map((e) => e.pitch))
+    let minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
+    let maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
     let elapsedBeats = 0
     let startBeat = 0
@@ -42,7 +39,8 @@ export default {
 
     watchEffect(() => {
       if (!canvas.value) return
-      canvas.value.width = 0.7 * useWindowSize().width.value
+
+      canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5)
       firstNotePositionX = canvas.value.height
       setUpNotes()
@@ -61,40 +59,22 @@ export default {
       },
     )
     let lastNoteEndBeat = 0
-    const barToBeat = (barNumber, timeSignatures) => {
-      let beats = 0
-      let lastBeatOffset = 0
-      let lastNumerator = 4
-      let lastBarNumber = 0
-
-      for (const ts of timeSignatures) {
-        const tsBeatOffset = ts.offset
-        const tsNumerator = ts.numerator / (ts.denominator / 4)
-
-        const barsBeforeTS = (tsBeatOffset - lastBeatOffset) / lastNumerator
-        const currentBarNumber = lastBarNumber + barsBeforeTS
-
-        if (barNumber < currentBarNumber) break
-
-        beats += (currentBarNumber - lastBarNumber) * lastNumerator
-        lastBeatOffset = tsBeatOffset
-        lastBarNumber = currentBarNumber
-        lastNumerator = tsNumerator
-      }
-
-      beats += (barNumber - lastBarNumber) * lastNumerator
-      return beats
-    }
 
     const setUpNotes = () => {
-      if (!props.midiNotes.length || !props.timeSignatures.length) return
+      if (!props.musicXmlNoteInfo.length || !props.timeSignatureInfo.length) return
 
       // Convert bar numbers to beat offsets
-      startBeat = barToBeat(Number(props.startBar) - 1, props.timeSignatures)
-      lastNoteEndBeat = barToBeat(Number(props.endBar), props.timeSignatures)
+      startBeat = getWhichBeatMeasureEndsWith(
+        Number(props.startMeasure) - 1,
+        props.timeSignatureInfo,
+      )
+      lastNoteEndBeat = getWhichBeatMeasureEndsWith(
+        Number(props.endMeasure),
+        props.timeSignatureInfo,
+      )
 
       // Filter notes in range
-      const notesInRange = props.midiNotes.filter((note) => {
+      const notesInRange = props.musicXmlNoteInfo.filter((note) => {
         const noteStart = note.offset
         const noteEnd = note.offset + note.duration
         return noteEnd > startBeat && noteStart < lastNoteEndBeat
@@ -102,23 +82,22 @@ export default {
 
       if (!notesInRange.length) return
 
-      minNotePitch = Math.min(...props.midiNotes.map((e) => e.pitch))
-      maxNotePitch = Math.max(...props.midiNotes.map((e) => e.pitch))
+      minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
+      maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
-      canvas.value.width = 0.7 * useWindowSize().width.value
+      canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = 10 * (maxNotePitch - minNotePitch + 5)
       firstNotePositionX = canvas.value.height
 
       ctx = canvas.value.getContext('2d')
 
-      // 🔁 Important: relative to startBeat!
       notes = notesInRange.map((note) => ({
         pitch: note.pitch,
         x: firstNotePositionX + (note.offset - startBeat) * pxPerBeat,
-        y: getYPosition(note.pitch),
+        y: getYPosition(note.pitch, minNotePitch, canvas.value.height),
         width: note.duration * pxPerBeat,
-        name: midiToNote(note.pitch),
-        startBeat: note.offset - startBeat, // relative
+        name: note.name,
+        startBeat: note.offset - startBeat,
       }))
 
       notes = notes.filter((note) => note.x < firstNotePositionX + lastNoteEndBeat * pxPerBeat)
@@ -132,20 +111,6 @@ export default {
       drawStaticNotes()
     }
 
-    const getCurrentTempo = (beat) => {
-      const absoluteBeat = beat + startBeat // adjust relative beat to global
-
-      let currentTempo = props.tempos[0].bpm
-      for (const t of props.tempos) {
-        if (absoluteBeat >= t.offset) {
-          currentTempo = t.bpm
-        } else {
-          break
-        }
-      }
-      return currentTempo * (props.tempoMultiplier / 100)
-    }
-    
     const animate = (timestamp) => {
       if (!props.isRecording) return
 
@@ -157,7 +122,7 @@ export default {
       const deltaTimeSec = (timestamp - lastFrameTime) / 1000
       lastFrameTime = timestamp
 
-      const currentTempo = getCurrentTempo(elapsedBeats)
+      const currentTempo = getCurrentTempo(elapsedBeats, props.tempoInfo, props.speed, props.startMeasure)
 
       const beatsPerSecond = currentTempo / 60
       let beatsThisFrame = deltaTimeSec * beatsPerSecond
@@ -219,11 +184,7 @@ export default {
       ctx.stroke()
     }
 
-    const getYPosition = (midiNote) => {
-      return canvas.value.height - (midiNote - minNotePitch + 2) * 10
-    }
-
-    watch([() => props.startBar, () => props.endBar], async () => {
+    watch([() => props.startMeasure, () => props.endMeasure], async () => {
       setUpNotes()
     })
 
@@ -232,22 +193,4 @@ export default {
 }
 </script>
 
-<style scoped>
-.visualizer-container {
-  width: 70%;
-  height: 100%;
-  border: 1px solid black;
-  overflow: hidden;
-  background-color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: auto;
-  margin-top: 50px;
-}
-
-canvas {
-  width: 100%;
-  height: 100%;
-}
-</style>
+<style scoped></style>

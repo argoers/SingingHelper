@@ -1,4 +1,3 @@
-// composables/useNotePlayback.js
 import { ref, watch } from 'vue'
 
 export function useNotePlayback(midiNotesRef) {
