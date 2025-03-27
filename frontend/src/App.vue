@@ -36,7 +36,7 @@
           v-model="isMetronomeEnabled"
           :disabled="isInCountdown || isRecording || isProcessingAudio"
         />
-        Metronoom
+        Metronoom laulmise ajal
       </label>
     </div>
 
@@ -74,7 +74,8 @@
       :musicXmlNoteInfo="musicXmlNoteInfo"
       :musicXmlNotesMappedToBeats="chartData.datasets[0].data"
       :recordedNotes="chartData.datasets[1].data"
-      :isRecording="isReplaying"
+      :isReplaying="isReplaying"
+      :isRecording="isInCountdown || isRecording || isProcessingAudio"
       :speed="speed"
       :startMeasure="startMeasure"
       :endMeasure="endMeasure"
@@ -93,6 +94,7 @@
       :chart-data="chartData"
       :isRecordingCancelled="isRecordingCancelled"
       :showChart="showChart"
+      :isRecording="isInCountdown || isRecording || isProcessingAudio"
       @toggle-chart="showChart = !showChart"
     />
   </div>
@@ -143,7 +145,7 @@ export default {
     const fileUploaded = ref(false)
     const startMeasure = ref(1)
     const endMeasure = ref(1)
-    const speed = ref(100)
+    const speed = ref(1)
     const totalMeasures = ref(null)
     const selectedFile = ref('')
     const chartData = ref({
@@ -176,7 +178,7 @@ export default {
     const startTime = ref(null)
     const duration = ref(null)
 
-    const { playMetronome, stopMetronome, playClickSound } = useMetronome(
+    const { buildMetronome, startMetronome, stopMetronome } = useMetronome(
       timeSignatureInfo,
       tempoInfo,
       speed,
@@ -213,8 +215,8 @@ export default {
       timeSignatureInfo,
       tempoInfo,
       selectedPart,
-      playClickSound,
-      playMetronome,
+      buildMetronome,
+      startMetronome,
       stopMetronome,
       isMetronomeEnabled,
       setStartTime: (v) => (startTime.value = v),

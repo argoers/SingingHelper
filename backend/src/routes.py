@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import os
 from musicXml_utils import get_time_signature_info, get_note_info, find_time_range_for_measures, get_tempo_info, get_measure_info, get_parts
-from audio_utils import record_audio_in_time, extract_pitches_from_recorded_audio
+from audio_utils import record_audio_in_time, extract_pitches_from_recorded_audio, end
 from utils import shutdown_backend
 import threading
 
@@ -45,14 +45,23 @@ def record_audio():
         end_measure = data.get("end_measure")
         speed_multiplier = data.get("speed")
         part_name = data.get("part_name")
+        latency_buffer = data.get("latency_buffer")
         
         start_time, end_time = find_time_range_for_measures(MUSICXML_FILE, start_measure, end_measure, speed_multiplier, part_name)
         DURATION = end_time - start_time
-        RECORDED_AUDIO = record_audio_in_time(duration=DURATION)
+        RECORDED_AUDIO = record_audio_in_time(DURATION + latency_buffer)
         
         return jsonify({"message": "recorded"})
 
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@api_routes.get("/end")
+def end_rec():
+    try:
+        end()
+        return jsonify({"message": "cancelled"})
+    except Exception as e:   
         return jsonify({"error": str(e)}), 500
     
 @api_routes.route("/extract-pitches-from-recorded-audio")

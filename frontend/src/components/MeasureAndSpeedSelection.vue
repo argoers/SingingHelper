@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { ref, watch, defineComponent } from 'vue'
+import { ref, watch, defineComponent, onMounted } from 'vue'
 
 export default defineComponent({
   props: {
@@ -41,7 +41,9 @@ export default defineComponent({
     const startMeasureInput = ref(String(props.startMeasure))
     const endMeasureInput = ref(String(props.endMeasure))
     const speedInput = ref(String(props.speed))
-
+    onMounted(() => {
+      speedInput.value = '100'
+    })
     watch(
       () => props.startMeasure,
       (val) => {

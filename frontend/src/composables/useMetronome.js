@@ -1,75 +1,115 @@
 import { ref } from 'vue'
-import metronomeSound from '@/assets/metronome.mp3'
+import clickUrl from '@/assets/metronome.mp3'
 
 export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
-  const metronomeInterval = ref(null)
-  const metronomeAudio = new Audio(metronomeSound)
-  metronomeAudio.load()
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  const sourceNode = ref(null)
+  const finalBuffer = ref(null)
 
-  const playClickSound = (loud) => {
-    metronomeAudio.currentTime = 0
-    metronomeAudio.volume = loud ? 1 : 0.1
-    metronomeAudio.play()
+  const loadSample = async (url) => {
+    const response = await fetch(url)
+    const arrayBuffer = await response.arrayBuffer()
+    return await audioCtx.decodeAudioData(arrayBuffer)
   }
 
-  const playMetronome = (startMeasure) => {
-    stopMetronome()
+  const startMetronome = async () => {
+    const source = audioCtx.createBufferSource()
+    source.buffer = finalBuffer.value
+    source.connect(audioCtx.destination)
+    source.start()
+    sourceNode.value = source
+  }
 
-    let beatIndex = 0
-    let currentOffset = 0
-    let timeSignatureIndex = 0
+  const buildMetronome = async (startMeasure, endMeasure, isMetronomeEnabled) => {
+    const clickSample = await loadSample(clickUrl)
+
+    const startBeat = measureInfo.value.find((m) => m.measure === startMeasure).start_beat
+    const endMeasureObj = measureInfo.value.find((m) => m.measure === endMeasure)
+    const endBeat = endMeasureObj.start_beat + endMeasureObj.duration_beats
+
+    let bufferDuration = 0
+    const beatEvents = []
+
+    let currentOffset = startBeat
+    let tsIndex = 0
     let tempoIndex = 0
-    let lastTime = performance.now()
 
-    const measureStartBeat = measureInfo.value.find((m) => m.measure === startMeasure).start_beat
-    let applicableTS = timeSignatureInfo.value.find(ts => ts.offset <= measureStartBeat)
-    let applicableTempo = tempoInfo.value.find(t => t.offset <= measureStartBeat)
+    let i = 0
+    let isInCountdown = true
+    while (true) {
+      const ts = timeSignatureInfo.value[tsIndex]
+      const tempo = tempoInfo.value[tempoIndex]
 
-    let beatsPerMeasure = applicableTS.numerator
-    let bpm = applicableTempo.bpm / speed.value
-    let secondsPerBeat = 60 / bpm
+      const nextTS = timeSignatureInfo.value[tsIndex + 1]
+      const nextTempo = tempoInfo.value[tempoIndex + 1]
 
-    const playNextBeat = () => {
-      const now = performance.now()
-      const elapsed = (now - lastTime) / 1000
-      lastTime = now
-      currentOffset += elapsed / secondsPerBeat
+      const beatsPerMeasure = ts.numerator
+      const beatType = ts.denominator
 
-      // Update time signature and speed
-      while (timeSignatureIndex < timeSignatureInfo.value.length &&
-             timeSignatureInfo.value[timeSignatureIndex].offset <= currentOffset) {
-        beatsPerMeasure = timeSignatureInfo.value[timeSignatureIndex].numerator
-        timeSignatureIndex++
+      const bpm = tempo.bpm * speed.value / (4 / beatType)
+      const secondsPerBeat = 60 / bpm
+
+      let nextChange = Math.min(nextTS?.offset ?? Infinity, nextTempo?.offset ?? Infinity, endBeat)
+      if (nextTS === undefined && nextTempo === undefined) break
+      
+      const beatsUntilNextChange = nextChange - currentOffset
+      if (beatsUntilNextChange <= 0) {
+        if (nextTS?.offset <= currentOffset) tsIndex++
+        if (nextTempo?.offset <= currentOffset) tempoIndex++
+        continue
       }
 
-      while (tempoIndex < tempoInfo.value.length &&
-             tempoInfo.value[tempoIndex].offset <= currentOffset) {
-        bpm = tempoInfo.value[tempoIndex].bpm / speed.value
-        secondsPerBeat = 60 / bpm
-        tempoIndex++
+      const numBeats = beatsUntilNextChange / (4 / beatType)
+
+      let j = isInCountdown ? 3 : 1
+      let k = 0
+      if (!isMetronomeEnabled) j -= 1
+      while (k < j) {
+        for (let i = 0; i < numBeats; i++) {
+          const isStrong = i % beatsPerMeasure === 0
+          beatEvents.push({
+            time: bufferDuration,
+            volume: isStrong ? 1 : 0.1,
+          })
+          bufferDuration += secondsPerBeat
+          if (k == 0) currentOffset += 4 / beatType
+        }
+        k++
       }
-
-      const isStrongBeat = beatIndex % beatsPerMeasure === 0
-      playClickSound(isStrongBeat)
-      beatIndex++
-
-      const delay = secondsPerBeat * 1000 - (performance.now() - now)
-      metronomeInterval.value = setTimeout(playNextBeat, delay)
+      isInCountdown = false
+      
+      if (nextChange == endBeat || !isMetronomeEnabled) break
     }
+    finalBuffer.value = audioCtx.createBuffer(
+      1,
+      bufferDuration * audioCtx.sampleRate,
+      audioCtx.sampleRate,
+    )
+    const output = finalBuffer.value.getChannelData(0)
 
-    playNextBeat()
+    for (const event of beatEvents) {
+      const clickData = clickSample.getChannelData(0)
+      const startSample = Math.floor(event.time * audioCtx.sampleRate)
+
+      for (let i = 0; i < clickData.length; i++) {
+        if (startSample + i < output.length) {
+          output[startSample + i] += clickData[i] * event.volume
+        }
+      }
+    }
   }
 
   const stopMetronome = () => {
-    if (metronomeInterval.value) {
-      clearTimeout(metronomeInterval.value)
-      metronomeInterval.value = null
+    if (sourceNode.value) {
+      sourceNode.value.stop()
+      sourceNode.value.disconnect()
+      sourceNode.value = null
     }
   }
 
   return {
-    playMetronome,
+    buildMetronome,
+    startMetronome,
     stopMetronome,
-    playClickSound,
   }
 }

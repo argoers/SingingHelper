@@ -3,7 +3,7 @@
     <h2 class="section-title">Laulmise graafik takti kaupa</h2>
 
     <div class="card">
-      <button @click="$emit('toggle-chart')">
+      <button :disabled="isRecording" @click="$emit('toggle-chart')">
         {{ showChart ? 'Peida' : 'Näita' }}
       </button>
     </div>
@@ -43,6 +43,7 @@ export default {
     chartData: Object,
     isRecordingCancelled: Boolean,
     showChart: Boolean,
+    isRecording: Boolean,
   },
   emits: ['toggle-chart'],
   setup(props, { emit }) {
@@ -56,7 +57,10 @@ export default {
       if (!allPitches) return
       chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 1
       chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 1
-      chartCanvas.value.height = (chartOptions.scales.y.max - chartOptions.scales.y.min) * 50
+      chartCanvas.value.height = Math.min(
+        800,
+        (chartOptions.scales.y.max - chartOptions.scales.y.min) * 30,
+      )
     }
 
     const chartOptions = {

@@ -95,12 +95,12 @@ export const extractPitchesFromRecordedAudio = async (startMeasure, endMeasure) 
   }
 }
 
-export const recordAudio = async (startMeasure, endMeasure, speed, partName) => {
+export const recordAudio = async (startMeasure, endMeasure, speed, partName, latencyBuffer) => {
   try {
     const response = await fetch(`${API_BASE_URL}/record-audio`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_measure: startMeasure, end_measure: endMeasure, speed: speed, part_name: partName}),
+      body: JSON.stringify({ start_measure: startMeasure, end_measure: endMeasure, speed: speed, part_name: partName, latency_buffer: latencyBuffer}),
     });
 
     const data = await response.json();
@@ -166,6 +166,14 @@ export const getPartNames = async () => {
   const response = await fetch(`${API_BASE_URL}/get-musicXml-part-names`);
   if (!response.ok) {
     throw new Error("Failed to fetch part names.");
+  }
+  return await response.json();
+};
+
+export const cancel = async () => {
+  const response = await fetch(`${API_BASE_URL}/end`);
+  if (!response.ok) {
+    throw new Error("Failed to end.");
   }
   return await response.json();
 };

@@ -5,8 +5,6 @@ def get_tempo_info(musicXml_file, part_name):
     try:
         score = converter.parse(musicXml_file)
         for part in score.parts:
-            if part.partName != part_name:
-                continue
             #print(part.flatten().getElementsByClass('MetronomeMark'))
             tempos = part.flatten().getElementsByClass('MetronomeMark')
 
@@ -19,7 +17,7 @@ def get_tempo_info(musicXml_file, part_name):
 
             # Sort tempo changes by offset (earliest to latest)
             tempo_changes.sort(key=lambda x: x[0])
-
+            
             # Track time in seconds while processing tempo changes
             cumulative_time = 0.0
             last_offset = 0.0
@@ -36,7 +34,7 @@ def get_tempo_info(musicXml_file, part_name):
 
                 # Store the tempo change with real-world time
                 final_tempo_list.append({"start": cumulative_time, "bpm": bpm, "offset": tempo_offset})
-
+            
             return final_tempo_list
         
     
@@ -149,28 +147,38 @@ def get_time_signature_info(musicXml_file, part_name):
 def get_end_beat_for_measure(measure_number, time_signatures):
     beats = 0
     last_beat_offset = 0
-    last_numerator = 4  # Default to 4/4
+    last_numerator = time_signatures[0]["numerator"]
+    last_denominator = time_signatures[0]["denominator"]
     last_measure_number = 0
 
     for ts in time_signatures:
         ts_beat_offset = ts["offset"]
         ts_numerator = ts["numerator"]
+        ts_denominator = ts["denominator"]
 
-        # Estimate how many measures occurred before this time signature
-        measures_in_section = (ts_beat_offset - last_beat_offset) / last_numerator
+        # How many quarter-note beats per measure under the previous time signature
+        beats_per_measure = (last_numerator * 4) / last_denominator
+
+        # Estimate how many measures occurred in this section
+        measures_in_section = (ts_beat_offset - last_beat_offset) / beats_per_measure
         ts_measure_number = last_measure_number + measures_in_section
 
         if measure_number < ts_measure_number:
             break
 
-        beats += (ts_measure_number - last_measure_number) * last_numerator
+        beats += measures_in_section * beats_per_measure
         last_beat_offset = ts_beat_offset
         last_numerator = ts_numerator
+        last_denominator = ts_denominator
         last_measure_number = ts_measure_number
 
     # Remaining measures from last time signature to requested measure
-    beats += (measure_number - last_measure_number) * last_numerator
+    beats_per_measure = (last_numerator * 4) / last_denominator
+    remaining_measures = measure_number - last_measure_number
+    beats += remaining_measures * beats_per_measure
+
     return beats
+
 
 def find_time_range_for_measures(musicXml_file, start_measure, end_measure, speed_multiplier, part_name):
     try:
@@ -183,7 +191,7 @@ def find_time_range_for_measures(musicXml_file, start_measure, end_measure, spee
         
         start_time /= speed_multiplier
         end_time /= speed_multiplier
-        
+    
         return start_time, end_time
 
     except Exception as e:
@@ -197,35 +205,29 @@ def get_end_time_for_beat(beat_offset, tempo_changes, time_signatures):
     elapsed_time = 0
     last_beat = 0
     last_bpm = tempo_changes[0]['bpm']
-    last_denominator = time_signatures[0]['denominator']
     
     for change in tempo_changes:
         tempo_beat = change['offset']
         bpm = change['bpm']
         if tempo_beat >= beat_offset:
             break
-        for signature in time_signatures:
-            denominator = signature['denominator']
-            signature_beat = signature['offset']
-            if signature_beat >= tempo_beat:
-                break
         
-        seconds_per_beat = 60 / last_bpm * (4 / last_denominator)
+        seconds_per_beat = 60 / last_bpm
         elapsed_time += (tempo_beat - last_beat) * seconds_per_beat
         last_beat = tempo_beat
         last_bpm = bpm
-        last_denominator = denominator
+        print('Here',tempo_beat, last_beat, last_bpm, elapsed_time)
     
-    seconds_per_beat = 60 / last_bpm * (4 / last_denominator)
+    seconds_per_beat = 60 / last_bpm
     
     elapsed_time += (beat_offset - last_beat) * seconds_per_beat
+    print(last_bpm, seconds_per_beat, beat_offset, last_beat)
     
     return elapsed_time
 
 
 def get_note_info(musicXml_file, start_measure, end_measure, part_name):
     try:
-        print(musicXml_file, start_measure, end_measure, part_name)
         score = converter.parse(musicXml_file)
         #score.show('text')
         tempos = score.flatten().getElementsByClass('MetronomeMark')

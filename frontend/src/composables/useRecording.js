@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import {
   recordAudio,
   extractPitchesFromRecordedAudio,
-  getMusicXmlStartTimeAndDurationInSeconds,
+  getMusicXmlStartTimeAndDurationInSeconds, cancel
 } from '@/services/api'
 
 export function useRecording({
@@ -15,8 +15,8 @@ export function useRecording({
   timeSignatureInfo,
   tempoInfo,
   selectedPart,
-  playClickSound,
-  playMetronome,
+  buildMetronome,
+  startMetronome,
   stopMetronome,
   isMetronomeEnabled,
   setStartTime,
@@ -45,13 +45,13 @@ export function useRecording({
     isRecordingCancelled.value = false
     errorMessage.value = ''
     isInCountdown.value = true
-    
-    const measureStartBeat = measureInfo.value.find(b => b.measure === startMeasure.value).start_beat
-    const applicableTS = timeSignatureInfo.value.find(ts => ts.offset <= measureStartBeat)
-    const applicableTempo = tempoInfo.value.find(t => t.offset <= measureStartBeat)
 
-    const bpm = applicableTempo.bpm
-    const beats = applicableTS.numerator
+    const measureStartBeat = measureInfo.value.find(b => b.measure === startMeasure.value).start_beat
+    const applicableTS = timeSignatureInfo.value.slice().reverse().find(ts => ts.offset <= measureStartBeat)
+    const applicableTempo = tempoInfo.value.slice().reverse().find(t => t.offset <= measureStartBeat)
+
+    const bpm = applicableTempo.bpm / (4 / applicableTS.denominator)
+    const beats = applicableTS.numerator * 2
     const clickInterval = 60 / bpm / speed.value
     const totalCountTime = beats * clickInterval
 
@@ -59,31 +59,33 @@ export function useRecording({
     let elapsedTime = 0
     let hasStartedRecording = false
 
-    while (true) {      
+
+    await buildMetronome(startMeasure.value, endMeasure.value, isMetronomeEnabled.value) 
+    await startMetronome();
+
+    while (true) {
+      elapsedTime += clickInterval
       const timeRemaining = totalCountTime - elapsedTime
-      if (countdown.value >= 0) {
-        console.log(timeRemaining, totalCountTime, elapsedTime)
-      }
+
       if (!hasStartedRecording && timeRemaining <= 1.0) {
-        startRecordingAudio(currentSession)
+        startRecordingAudio(currentSession, timeRemaining)
         hasStartedRecording = true
       }
+      
       if (timeRemaining <= 0) break
 
-      if (playClickSound && isMetronomeEnabled.value) playClickSound()
       await new Promise(resolve => setTimeout(resolve, clickInterval * 1000))
-      elapsedTime += clickInterval
+
       countdown.value--
     }
 
-    if (playMetronome && isMetronomeEnabled.value) playMetronome()
     isInCountdown.value = false
     isRecording.value = true
   }
 
-  const startRecordingAudio = async (currentSession) => {
+  const startRecordingAudio = async (currentSession, latencyBuffer) => {
     try {
-      await recordAudio(startMeasure.value, endMeasure.value, speed.value, selectedPart.value)
+      await recordAudio(startMeasure.value, endMeasure.value, speed.value, selectedPart.value, latencyBuffer)
     } catch (err) {
       setError(err.message)
       return
@@ -91,13 +93,13 @@ export function useRecording({
 
     if (currentSession !== requestSession || isRecordingCancelled.value) return
 
+    stopMetronome()
     isRecording.value = false
     isProcessingAudio.value = true
 
     try {
       const data = await extractPitchesFromRecordedAudio(startMeasure.value, endMeasure.value)
       if (currentSession === requestSession && !isRecordingCancelled.value) {
-        chartData.value.datasets[1].data = data.liveNotes
         isProcessingAudio.value = false
 
         const timeData = await getMusicXmlStartTimeAndDurationInSeconds(
@@ -135,6 +137,7 @@ export function useRecording({
         })
 
         chartData.value.datasets[0].data = musicXmlNotesMappedToBeats
+        chartData.value.datasets[1].data = data.liveNotes
         chartData.value.labels = labels
         showChart.value = true
         showReplay.value = true
@@ -145,8 +148,13 @@ export function useRecording({
     }
   }
 
-  const cancelRecordingProcess = () => {
+  const cancelRecordingProcess = async () => {
     if (stopMetronome) stopMetronome()
+    try {
+      await cancel();
+    } catch (error) {
+      console.error(error)
+    }
     isRecordingCancelled.value = true
     isRecording.value = false
     isProcessingAudio.value = false
