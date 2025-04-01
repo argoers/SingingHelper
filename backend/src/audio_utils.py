@@ -6,7 +6,7 @@ import time
 stop_recording = False
 recorded_data = []
 
-def callback(indata, status):
+def callback(indata, a, b, status):
     if status:
         print(status)
     if not stop_recording:
@@ -34,18 +34,7 @@ def record_audio_in_time(duration, samplerate=44100):
     audio = np.concatenate(recorded_data, axis=0)
     return np.squeeze(audio)
 
-'''def record_audio_in_time(duration, samplerate=44100):
-    try:
-        print(duration)
-        duration += 1 # Add 1 second to account for latency
-        audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype="float32")
-        sd.wait()
-        return np.squeeze(audio)
-    except Exception as e:
-        print(f"Error recording audio: {e}")
-        return np.array([])'''
-
-def extract_pitches_from_recorded_audio(audio, samplerate=44100, hop_size=256):
+def extract_pitches_from_recorded_audio(audio, latency_buffer, samplerate=44100, hop_size=256):
     if audio is None or len(audio) == 0:
         return np.array([])
 
@@ -63,6 +52,6 @@ def extract_pitches_from_recorded_audio(audio, samplerate=44100, hop_size=256):
         for t, pitch in enumerate(pitches) if pitch > 0
     ]
     
-    filtered_pitch_list = [(entry[0]-1, entry[1]) for entry in pitch_list if entry[0] >= 1.0]
+    filtered_pitch_list = [(entry[0]-latency_buffer, round(entry[1],2)) for entry in pitch_list if entry[0] >= latency_buffer]
     
     return np.array(filtered_pitch_list) if filtered_pitch_list else np.array([])

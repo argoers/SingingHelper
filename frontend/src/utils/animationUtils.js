@@ -37,6 +37,6 @@ export const getCurrentTempo = (beat, tempoInfo, speed, startMeasure) => {
     return currentTempo * speed
   }
 
-  export const getYPosition = (midiNote, minNotePitch, canvasHeight) => {
-    return canvasHeight - (midiNote - minNotePitch + 2) * 10
+  export const getYPosition = (midiNote, minNotePitch, canvasHeight, oneToneHeight) => {
+    return canvasHeight - (midiNote - minNotePitch + 2) * oneToneHeight / 2
   }

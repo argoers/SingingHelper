@@ -12,6 +12,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 MUSICXML_FILE = None 
 RECORDED_AUDIO = None
 DURATION = None
+LATENCY_BUFFER = None
 api_routes = Blueprint("api_routes", __name__)
 
 @api_routes.route("/upload-musicXml", methods=["POST"])
@@ -38,6 +39,7 @@ def upload_musicXml():
 def record_audio():
     global RECORDED_AUDIO
     global DURATION
+    global LATENCY_BUFFER
     print("Recording audio...")
     try:
         data = request.get_json()
@@ -45,11 +47,11 @@ def record_audio():
         end_measure = data.get("end_measure")
         speed_multiplier = data.get("speed")
         part_name = data.get("part_name")
-        latency_buffer = data.get("latency_buffer")
+        LATENCY_BUFFER = data.get("latency_buffer")
         
         start_time, end_time = find_time_range_for_measures(MUSICXML_FILE, start_measure, end_measure, speed_multiplier, part_name)
         DURATION = end_time - start_time
-        RECORDED_AUDIO = record_audio_in_time(DURATION + latency_buffer)
+        RECORDED_AUDIO = record_audio_in_time(DURATION + LATENCY_BUFFER)
         
         return jsonify({"message": "recorded"})
 
@@ -66,7 +68,7 @@ def end_rec():
     
 @api_routes.route("/extract-pitches-from-recorded-audio")
 def extract_pitches():
-    live_pitches = extract_pitches_from_recorded_audio(RECORDED_AUDIO)
+    live_pitches = extract_pitches_from_recorded_audio(RECORDED_AUDIO, LATENCY_BUFFER)
     return jsonify({"live_pitches": live_pitches.tolist(), "duration": DURATION })
 
 @api_routes.route("/get-musicXml-tempo-info", methods=['POST'])

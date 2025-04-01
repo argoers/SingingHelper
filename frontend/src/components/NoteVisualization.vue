@@ -100,13 +100,13 @@ export default {
       canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = (oneToneHeight / 2) * (maxNotePitch - minNotePitch + 5)
       firstNotePositionX = canvas.value.height
-      console.log(canvas.value.width)
+
       ctx = canvas.value.getContext('2d')
 
       notes = notesInRange.map((note) => ({
         pitch: note.pitch,
         x: firstNotePositionX + (note.offset - startBeat) * pxPerBeat,
-        y: getYPosition(note.pitch, minNotePitch, canvas.value.height),
+        y: getYPosition(note.pitch, minNotePitch, canvas.value.height, oneToneHeight),
         width: note.duration * pxPerBeat,
         name: note.name,
         startBeat: note.offset - startBeat,

@@ -55,8 +55,8 @@ export default {
         .flatMap((dataset) => dataset.data)
         .filter((value) => value !== null) // Remove null values
       if (!allPitches) return
-      chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 1
-      chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 1
+      chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 2
+      chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 2
       chartCanvas.value.height = Math.min(
         800,
         (chartOptions.scales.y.max - chartOptions.scales.y.min) * 30,

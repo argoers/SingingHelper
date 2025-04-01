@@ -101,7 +101,7 @@
 </template>
 
 <script lang="js">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import FileUpload from './components/FileUpload.vue'
 import ChartDisplay from './components/ChartDisplay.vue'
 import NoteVisualization from './components/NoteVisualization.vue'

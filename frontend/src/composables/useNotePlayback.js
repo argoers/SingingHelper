@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 export function useNotePlayback(midiNotesRef) {
   const isNoteBeingPlayed = ref(false)

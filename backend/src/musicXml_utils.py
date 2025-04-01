@@ -34,7 +34,10 @@ def get_tempo_info(musicXml_file, part_name):
 
                 # Store the tempo change with real-world time
                 final_tempo_list.append({"start": cumulative_time, "bpm": bpm, "offset": tempo_offset})
-            
+
+            if not final_tempo_list:
+                final_tempo_list.append({"start": 0.0, "bpm": 120, "offset": 0.0})
+
             return final_tempo_list
         
     

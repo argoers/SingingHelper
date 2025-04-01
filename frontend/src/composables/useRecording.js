@@ -63,22 +63,18 @@ export function useRecording({
     await buildMetronome(startMeasure.value, endMeasure.value, isMetronomeEnabled.value) 
     await startMetronome();
 
-    while (true) {
+    while (countdown.value > 0) {
+      await new Promise(resolve => setTimeout(resolve, clickInterval * 1000))
       elapsedTime += clickInterval
       const timeRemaining = totalCountTime - elapsedTime
-
-      if (!hasStartedRecording && timeRemaining <= 1.0) {
+      
+      if (!hasStartedRecording && timeRemaining < 1.0) {
         startRecordingAudio(currentSession, timeRemaining)
         hasStartedRecording = true
       }
-      
-      if (timeRemaining <= 0) break
-
-      await new Promise(resolve => setTimeout(resolve, clickInterval * 1000))
-
       countdown.value--
     }
-
+    
     isInCountdown.value = false
     isRecording.value = true
   }
@@ -180,34 +176,3 @@ export function useRecording({
     enableReplay: () => (showReplay.value = !showReplay.value),
   }
 }
-
-/*
-            function timeToBar(t) {
-              let currentBar = measureInfo.value[startMeasure.value - 1].measure
-              for (let i = 1; i < measureInfo.value.length; i++) {
-                //console.log(t, measureInfo.value[i].start_time / (speed.value / 100))
-                if (t < measureInfo.value[i].start_time / (speed.value / 100)) break
-                currentBar = measureInfo.value[i].measure
-              }
-              return currentBar
-            }
-            const timeStep = data.duration / numPoints
-            const timeAxis = Array.from(
-              { length: numPoints },
-              (_, i) => startTime.value + i * timeStep,
-            )
-
-            const labels = timeAxis.map((t, i) => {
-              const currentBar = timeToBar(t)
-              const previousMeasure = i > 0 ? timeToBar(timeAxis[i - 1]) : null
-              return currentBar !== previousMeasure ? `Bar ${currentBar}` : ''
-            })
-
-            const musicXmlNotesMappedToBeats = timeAxis.map((t) => {
-              const activeNote = musicXmlNoteInfo.value.find(
-                (note) =>
-                  note.start / (speed.value / 100) <= t && t <= note.end / (speed.value / 100),
-              )
-              return activeNote ? activeNote.pitch : null
-            })
-            */

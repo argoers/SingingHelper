@@ -50,7 +50,6 @@ export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
       const secondsPerBeat = 60 / bpm
 
       let nextChange = Math.min(nextTS?.offset ?? Infinity, nextTempo?.offset ?? Infinity, endBeat)
-      if (nextTS === undefined && nextTempo === undefined) break
       
       const beatsUntilNextChange = nextChange - currentOffset
       if (beatsUntilNextChange <= 0) {
@@ -59,12 +58,16 @@ export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
         continue
       }
 
-      const numBeats = beatsUntilNextChange / (4 / beatType)
+      let numBeats = beatsUntilNextChange / (4 / beatType)
 
       let j = isInCountdown ? 3 : 1
       let k = 0
-      if (!isMetronomeEnabled) j -= 1
+      if (!isMetronomeEnabled) {
+        numBeats = beatsPerMeasure * (4 / beatType)
+        j -= 1
+      }
       while (k < j) {
+
         for (let i = 0; i < numBeats; i++) {
           const isStrong = i % beatsPerMeasure === 0
           beatEvents.push({
@@ -78,7 +81,12 @@ export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
       }
       isInCountdown = false
       
-      if (nextChange == endBeat || !isMetronomeEnabled) break
+      if (nextTS === undefined && nextTempo === undefined){
+        break
+      }
+      if (nextChange == endBeat || !isMetronomeEnabled) {
+        break
+      }
     }
     finalBuffer.value = audioCtx.createBuffer(
       1,

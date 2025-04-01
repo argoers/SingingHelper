@@ -31,7 +31,7 @@
   </div>
 </template>
 <script lang="js">
-import { ref, onMounted, watch, watchEffect, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
 export default {
@@ -120,7 +120,8 @@ export default {
     )
 
     const setUpNotes = () => {
-      if (!props.musicXmlNoteInfo.length || !props.recordedNotes.length) return
+      if (!props.musicXmlNoteInfo.length || !props.recordedNotes.length || !canvas.value.getContext)
+        return
 
       minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
       maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
@@ -150,7 +151,7 @@ export default {
         return {
           pitch: note.pitch,
           x: firstNotePositionX + (note.offset - startBeat) * pxPerBeat,
-          y: getYPosition(note.pitch, minNotePitch, canvas.value.height),
+          y: getYPosition(note.pitch, minNotePitch, canvas.value.height, oneToneHeight),
           width: note.duration * pxPerBeat,
           name: note.name,
           startBeat: note.offset,
@@ -203,6 +204,7 @@ export default {
     }
 
     const drawNote = (note) => {
+      console.log(props.recordedNotes.filter((e) => e !== 48.04995771500077))
       const noteScreenX = note.x - replayTime.value * pxPerBeat
       const isActive =
         noteScreenX <= firstNotePositionX && noteScreenX + note.width > firstNotePositionX
@@ -214,7 +216,7 @@ export default {
         const pitchAtFrame = props.recordedNotes[frameIdx]
 
         ctx.fillStyle =
-          pitchAtFrame <= note.pitch + 0.5 && pitchAtFrame >= note.pitch - 0.5 ? 'green' : 'red'
+          pitchAtFrame <= note.pitch + 0.1 && pitchAtFrame >= note.pitch - 0.051 ? 'green' : 'red'
 
         const barWidth = note.width / note.timeIndexes.length
 
