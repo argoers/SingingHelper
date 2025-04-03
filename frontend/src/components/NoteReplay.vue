@@ -30,7 +30,7 @@
     </div>
   </div>
 </template>
-<script lang="js">
+<script lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
@@ -56,10 +56,10 @@ export default {
     let ctx = null
     let notes = []
     let animationFrameId
-    let pxPerBeat = 200
-    let oneToneHeight = 30
+    const pxPerBeat = 200
+    const oneToneHeight = 30
 
-    let firstNotePositionX
+    const firstNotePositionX = 120
     let minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
     let maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
@@ -76,18 +76,9 @@ export default {
         startMeasureOnMount = props.startMeasure
         endMeasureOnMount = props.endMeasure
         setUpNotes()
-        setUpNotes()
         window.addEventListener('resize', setUpNotes)
       })
     })
-
-    /* watchEffect(() => {
-      if (!canvas.value) return
-      canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
-      canvas.value.height = (oneToneHeight / 2) * (maxNotePitch - minNotePitch + 5)
-      firstNotePositionX = canvas.value.height
-      //setUpNotes()
-    }) */
 
     watch(replayTime, () => {
       if (!props.isReplaying) {
@@ -138,10 +129,10 @@ export default {
       ctx = canvas.value.getContext('2d')
       canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = (oneToneHeight / 2) * (maxNotePitch - minNotePitch + 5)
-      firstNotePositionX = canvas.value.height
+
       const splitLength = props.durationInSeconds / props.musicXmlNotesMappedToBeats.length
 
-      notes = props.musicXmlNoteInfo.map((note, i) => {
+      notes = props.musicXmlNoteInfo.map((note) => {
         const timeIndexes = props.musicXmlNotesMappedToBeats
           .map((_, i) => i)
           .filter((i) => {
@@ -185,7 +176,8 @@ export default {
       replayTime.value += beatsThisFrame
 
       const lastNote = notes[notes.length - 1]
-      if (lastNote && replayTime.value >= lastNote.startBeat + lastNote.duration) {
+
+      if (lastNote && replayTime.value >= lastNote.startBeat + lastNote.duration - startBeat) {
         emit('stop-replay')
         cancelAnimationFrame(animationFrameId)
         replayTime.value = 0
@@ -204,7 +196,6 @@ export default {
     }
 
     const drawNote = (note) => {
-      console.log(props.recordedNotes.filter((e) => e !== 48.04995771500077))
       const noteScreenX = note.x - replayTime.value * pxPerBeat
       const isActive =
         noteScreenX <= firstNotePositionX && noteScreenX + note.width > firstNotePositionX
@@ -230,12 +221,10 @@ export default {
     }
 
     const drawPlayheads = () => {
-      // Fixed red playhead
       drawPlayhead(firstNotePositionX, true)
 
-      // Moving grey measure lines
       measureBeats.forEach((beat) => {
-        const x = firstNotePositionX + (beat - startBeat) * pxPerBeat - replayTime.value * pxPerBeat
+        const x = firstNotePositionX + (beat - startBeat - replayTime.value) * pxPerBeat
         if (x > 0 && x < canvas.value.width && x != firstNotePositionX) {
           drawPlayhead(x, false)
         }

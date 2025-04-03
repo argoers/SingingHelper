@@ -24,7 +24,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, watch, defineComponent, onMounted } from 'vue'
 
 export default defineComponent({
@@ -65,14 +65,15 @@ export default defineComponent({
 
     const sanitizeStartMeasure = () => {
       const parsed = Math.round(parseFloat(startMeasureInput.value))
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= props.totalMeasures) {
-        startMeasureInput.value = String(parsed)
-        emit('update:startMeasure', parsed)
-
-        const end = parseInt(endMeasureInput.value)
-        if (end < parsed) {
-          endMeasureInput.value = String(parsed)
-          emit('update:endMeasure', parsed)
+      if (!isNaN(parsed) && parsed >= 1) {
+        if (parsed > props.totalMeasures) {
+          endMeasureInput.value = String(props.totalMeasures)
+          emit('update:endMeasure', props.totalMeasures)
+          startMeasureInput.value = String(props.totalMeasures)
+          emit('update:startMeasure', props.totalMeasures)
+        } else {
+          startMeasureInput.value = String(parsed)
+          emit('update:startMeasure', parsed)
         }
       } else {
         startMeasureInput.value = '1'
@@ -83,9 +84,18 @@ export default defineComponent({
     const sanitizeEndMeasure = () => {
       const parsed = Math.round(parseFloat(endMeasureInput.value))
       const start = parseInt(startMeasureInput.value)
-      if (!isNaN(parsed) && parsed >= start && parsed <= props.totalMeasures) {
-        endMeasureInput.value = String(parsed)
-        emit('update:endMeasure', parsed)
+      if (!isNaN(parsed)) {
+        if ((parsed < start && parsed > 0) || (parsed >= start && parsed <= props.totalMeasures)) {
+          endMeasureInput.value = String(parsed)
+          emit('update:endMeasure', parsed)
+          if (parsed < start) {
+            startMeasureInput.value = String(parsed)
+            emit('update:startMeasure', parsed)
+          }
+        } else {
+          endMeasureInput.value = String(props.totalMeasures)
+          emit('update:endMeasure', props.totalMeasures)
+        }
       } else {
         endMeasureInput.value = String(props.totalMeasures)
         emit('update:endMeasure', props.totalMeasures)

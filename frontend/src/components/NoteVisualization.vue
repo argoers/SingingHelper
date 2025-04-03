@@ -4,8 +4,8 @@
   </div>
 </template>
 
-<script lang="js">
-import { ref, onMounted, watch, watchEffect, nextTick } from 'vue'
+<script lang="ts">
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
 export default {
@@ -17,16 +17,17 @@ export default {
     endMeasure: [Number, String],
     tempoInfo: Object,
     timeSignatureInfo: Object,
+    selectedPart: String,
   },
   setup(props) {
     const canvas = ref(null)
     let ctx = null
     let notes = []
     let animationFrameId
-    let pxPerBeat = 200
-    let oneToneHeight = 30
+    const pxPerBeat = 200
+    const oneToneHeight = 30
 
-    let firstNotePositionX
+    const firstNotePositionX = 120
     let minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
     let maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
@@ -41,20 +42,11 @@ export default {
       })
     })
 
-    /*   watchEffect(() => {
-      if (!canvas.value) return
-
-      canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
-      canvas.value.height = oneToneHeight * (maxNotePitch - minNotePitch + 5)
-      firstNotePositionX = canvas.value.height
-      setUpNotes()
-    })
- */
     watch(
       () => props.isRecording,
       (isRecording) => {
-        elapsedBeats = startBeat
         if (isRecording) {
+          elapsedBeats = startBeat
           lastFrameTime = performance.now()
           requestAnimationFrame(animate)
         } else {
@@ -67,9 +59,6 @@ export default {
     let measureBeats
 
     const setUpNotes = () => {
-      if (!props.musicXmlNoteInfo.length) return
-
-      // Convert bar numbers to beat offsets
       startBeat = getWhichBeatMeasureEndsWith(
         Number(props.startMeasure) - 1,
         props.timeSignatureInfo,
@@ -85,21 +74,17 @@ export default {
         measureBeats.push(beat)
       }
 
-      // Filter notes in range
       const notesInRange = props.musicXmlNoteInfo.filter((note) => {
         const noteStart = note.offset
         const noteEnd = note.offset + note.duration
         return noteEnd > startBeat && noteStart < lastNoteEndBeat
       })
 
-      if (!notesInRange.length) return
-
       minNotePitch = Math.min(...props.musicXmlNoteInfo.map((e) => e.pitch))
       maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
       canvas.value.width = canvas.value.parentElement.getBoundingClientRect().width
       canvas.value.height = (oneToneHeight / 2) * (maxNotePitch - minNotePitch + 5)
-      firstNotePositionX = canvas.value.height
 
       ctx = canvas.value.getContext('2d')
 
@@ -152,13 +137,14 @@ export default {
       const scrollAmount = beatsThisFrame * pxPerBeat
 
       notes.forEach((note) => {
-        note.x -= scrollAmount
         drawNote(note)
+        note.x -= scrollAmount
       })
 
       notes = notes.filter((note) => note.x + note.width > 0)
 
       if (elapsedBeats >= lastNoteEndBeat) {
+        elapsedBeats = 0
         cancelAnimationFrame(animationFrameId)
         return
       }
@@ -175,12 +161,15 @@ export default {
     }
 
     const drawPlayheads = () => {
-      // Fixed red playhead
       drawPlayhead(firstNotePositionX, true)
-
-      // Moving grey measure lines
       measureBeats.forEach((beat) => {
-        const x = firstNotePositionX + (beat - startBeat) * pxPerBeat - elapsedBeats * pxPerBeat
+        let x
+        if (elapsedBeats == 0) {
+          x = firstNotePositionX + (beat - startBeat) * pxPerBeat
+        } else {
+          x = firstNotePositionX + (beat - elapsedBeats) * pxPerBeat
+        }
+
         if (x > 0 && x < canvas.value.width && x != firstNotePositionX) {
           drawPlayhead(x, false)
         }
@@ -211,7 +200,7 @@ export default {
       ctx.stroke()
     }
 
-    watch([() => props.startMeasure, () => props.endMeasure], async () => {
+    watch([() => props.startMeasure, () => props.endMeasure, () => props.musicXmlNoteInfo], () => {
       setUpNotes()
     })
 

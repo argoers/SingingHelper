@@ -13,7 +13,7 @@
   </div>
 </template>
 
-<script lang="js">
+<script lang="ts">
 import {
   Chart as ChartJS,
   Title,
@@ -46,14 +46,14 @@ export default {
     isRecording: Boolean,
   },
   emits: ['toggle-chart'],
-  setup(props, { emit }) {
+  setup(props) {
     const chartCanvas = ref(null)
     let chartInstance = null
 
     const computeMinMaxPitch = () => {
       const allPitches = props.chartData.datasets
         .flatMap((dataset) => dataset.data)
-        .filter((value) => value !== null) // Remove null values
+        .filter((value) => value !== null)
       if (!allPitches) return
       chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 2
       chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 2
@@ -112,7 +112,7 @@ export default {
       const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
       const octave = Math.floor(midi / 12) - 1
       const note = noteNames[midi % 12]
-      return `${note}${octave}`
+      return `${note}${octave}`.length == 3 ? null : `${note}${octave}`
     }
 
     onMounted(() => {

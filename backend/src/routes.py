@@ -40,7 +40,6 @@ def record_audio():
     global RECORDED_AUDIO
     global DURATION
     global LATENCY_BUFFER
-    print("Recording audio...")
     try:
         data = request.get_json()
         start_measure = data.get("start_measure")
@@ -71,12 +70,10 @@ def extract_pitches():
     live_pitches = extract_pitches_from_recorded_audio(RECORDED_AUDIO, LATENCY_BUFFER)
     return jsonify({"live_pitches": live_pitches.tolist(), "duration": DURATION })
 
-@api_routes.route("/get-musicXml-tempo-info", methods=['POST'])
+@api_routes.get("/get-musicXml-tempo-info")
 def get_musicXml_tempo_info():
     try:
-        data = request.get_json()
-        part_name = data.get("part_name")
-        return {"tempo_info": get_tempo_info(MUSICXML_FILE, part_name)}
+        return {"tempo_info": get_tempo_info(MUSICXML_FILE)}
     
     except Exception as e:
         return {"error": str(e)}

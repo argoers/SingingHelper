@@ -60,21 +60,30 @@ export function useRecording({
     let hasStartedRecording = false
 
 
-    await buildMetronome(startMeasure.value, endMeasure.value, isMetronomeEnabled.value) 
+    await buildMetronome(startMeasure.value, endMeasure.value, isMetronomeEnabled.value)
     await startMetronome();
 
     while (countdown.value > 0) {
+      if (!isInCountdown.value) {
+        countdown.value = 0
+        return
+      }
       await new Promise(resolve => setTimeout(resolve, clickInterval * 1000))
+
       elapsedTime += clickInterval
       const timeRemaining = totalCountTime - elapsedTime
-      
+
+      if (!isInCountdown.value) {
+        countdown.value = 0
+        return
+      }
       if (!hasStartedRecording && timeRemaining < 1.0) {
         startRecordingAudio(currentSession, timeRemaining)
         hasStartedRecording = true
       }
       countdown.value--
     }
-    
+
     isInCountdown.value = false
     isRecording.value = true
   }
@@ -145,11 +154,15 @@ export function useRecording({
   }
 
   const cancelRecordingProcess = async () => {
-    if (stopMetronome) stopMetronome()
-    try {
-      await cancel();
-    } catch (error) {
-      console.error(error)
+    stopMetronome()
+    if (isRecording.value) {
+      try {
+        await cancel();
+      } catch (error) {
+        console.error(error)
+      }
+    } else {
+      isInCountdown.value = false
     }
     isRecordingCancelled.value = true
     isRecording.value = false

@@ -14,13 +14,19 @@
       </p>
       <div v-if="fileUploaded">
         <label for="partSelect">Partii:</label>
-        <select id="partSelect" v-model="selectedPart" @change="fetchNotes">
+        <select
+          id="partSelect"
+          v-model="selectedPart"
+          @change="fetchInfo"
+          :disabled="isInCountdown || isRecording || isProcessingAudio"
+        >
           <option v-for="part in parts" :key="part" :value="part">{{ part }}</option>
         </select>
       </div>
+      <p v-if="errorMessage && errorMessage.includes('fail')" class="error">{{ errorMessage }}</p>
     </div>
 
-    <div class="card" v-show="selectedPart">
+    <div class="card" v-show="selectedPart && musicXmlNoteInfo !== null">
       <MeasureAndSpeedSelection
         :selectedPart="selectedPart"
         :disabled="isInCountdown || isRecording || isProcessingAudio"
@@ -40,7 +46,7 @@
       </label>
     </div>
 
-    <div class="card" v-show="selectedPart">
+    <div class="card" v-show="selectedPart && musicXmlNoteInfo !== null">
       <RecordingControls
         :selectedPart="selectedPart"
         :isRecording="isRecording"
@@ -49,6 +55,7 @@
         :isInCountdown="isInCountdown"
         :countdown="countdown"
         :disabled="isInCountdown || isRecording || isProcessingAudio"
+        :musicXmlNoteInfo="musicXmlNoteInfo"
         @start-recording="startRecordingProcess"
         @cancel-recording="cancelRecordingProcess"
         @play-first-note="playFirstNote"
@@ -67,10 +74,12 @@
         :endMeasure="endMeasure"
         :tempoInfo="tempoInfo"
         :timeSignatureInfo="timeSignatureInfo"
+        :selectedPart="selectedPart"
       />
     </div>
     <NoteReplay
       v-if="chartData.datasets[1].data && chartData.datasets[0].data"
+      v-show="chartData.datasets[1].data && chartData.datasets[0].data"
       :musicXmlNoteInfo="musicXmlNoteInfo"
       :musicXmlNotesMappedToBeats="chartData.datasets[0].data"
       :recordedNotes="chartData.datasets[1].data"
@@ -91,6 +100,7 @@
 
     <ChartDisplay
       v-if="chartData.labels.length > 0"
+      v-show="chartData.labels.length > 0"
       :chart-data="chartData"
       :isRecordingCancelled="isRecordingCancelled"
       :showChart="showChart"
@@ -100,8 +110,8 @@
   </div>
 </template>
 
-<script lang="js">
-import { ref } from 'vue'
+<script lang="ts">
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import FileUpload from './components/FileUpload.vue'
 import ChartDisplay from './components/ChartDisplay.vue'
 import NoteVisualization from './components/NoteVisualization.vue'
@@ -152,7 +162,7 @@ export default {
       labels: [],
       datasets: [
         {
-          label: 'MIDI Notes',
+          label: 'Noodid failist',
           borderColor: 'blue',
           backgroundColor: 'blue',
           pointRadius: 0,
@@ -160,7 +170,7 @@ export default {
           stepped: 'before',
         },
         {
-          label: 'Sung Notes',
+          label: 'Salvestatud noodid',
           borderColor: 'red',
           backgroundColor: 'red',
           pointRadius: 3,
@@ -224,7 +234,15 @@ export default {
       setError: (e) => (errorMessage.value = e),
     })
 
-    const fetchNotes = async () => {
+    const resetGraphData = () => {
+      chartData.value.labels = {}
+      chartData.value.datasets[0].data = null
+      chartData.value.datasets[1].data = null
+    }
+
+    const fetchInfo = async () => {
+      resetGraphData()
+
       try {
         const response = await getMeasureInfo(selectedPart.value)
         measureInfo.value = response.measure_info
@@ -241,11 +259,15 @@ export default {
         errorMessage.value = error.message
       }
       try {
-        const response = await getTempoInfo(selectedPart.value)
+        const response = await getTempoInfo()
         tempoInfo.value = response.tempo_info
       } catch (error) {
         errorMessage.value = error.message
       }
+      fetchNotes()
+    }
+
+    const fetchNotes = async () => {
       try {
         const response = await getMusicXmlNoteInfo(
           startMeasure.value,
@@ -260,23 +282,36 @@ export default {
 
     const handleFileUploaded = async (success) => {
       fileUploaded.value = success
+      resetGraphData()
       if (!success) {
+        musicXmlNoteInfo.value = null
         errorMessage.value = 'Vali MusicXML fail!'
-        chartData.value.labels = {}
-        chartData.value.datasets[0].data = null
-        chartData.value.datasets[1].data = null
         return
       }
-      chartData.value.labels = {}
-      chartData.value.datasets[0].data = null
-      chartData.value.datasets[1].data = null
       startMeasure.value = 1
       try {
         const response = await getPartNames()
         parts.value = response.parts
+        selectedPart.value = null
       } catch (error) {
         errorMessage.value = error.message
       }
+    }
+
+    onMounted(() => {
+      window.addEventListener('click', clearError)
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('click', clearError)
+    })
+
+    watch([startMeasure, endMeasure], () => {
+      fetchNotes()
+    })
+
+    const clearError = () => {
+      errorMessage.value = null
     }
 
     return {
@@ -287,7 +322,7 @@ export default {
       handleFileUploaded,
       parts,
       selectedPart,
-      fetchNotes,
+      fetchInfo,
       startMeasure,
       endMeasure,
       speed,

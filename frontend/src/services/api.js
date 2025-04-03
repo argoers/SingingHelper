@@ -115,13 +115,8 @@ export const recordAudio = async (startMeasure, endMeasure, speed, partName, lat
   }
 };
 
-export const getTempoInfo = async (partName) => {
-  const response = await fetch(`${API_BASE_URL}/get-musicXml-tempo-info`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ part_name: partName }),
-  });
-  
+export const getTempoInfo = async () => {
+  const response = await fetch(`${API_BASE_URL}/get-musicXml-tempo-info`);
   if (!response.ok) {
     throw new Error("Failed to fetch tempo info.");
   }

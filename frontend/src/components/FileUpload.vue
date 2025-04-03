@@ -9,7 +9,7 @@
   </div>
 </template>
 
-<script lang="js">
+<script lang="ts">
 import { ref } from 'vue'
 import { uploadMusicXml } from '../services/api'
 

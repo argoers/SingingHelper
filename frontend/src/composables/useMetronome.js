@@ -34,7 +34,6 @@ export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
     let tsIndex = 0
     let tempoIndex = 0
 
-    let i = 0
     let isInCountdown = true
     while (true) {
       const ts = timeSignatureInfo.value[tsIndex]

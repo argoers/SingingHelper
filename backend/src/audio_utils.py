@@ -7,8 +7,6 @@ stop_recording = False
 recorded_data = []
 
 def callback(indata, a, b, status):
-    if status:
-        print(status)
     if not stop_recording:
         recorded_data.append(indata.copy())
         
@@ -23,14 +21,11 @@ def record_audio_in_time(duration, samplerate=44100):
     stop_recording = False
     
     with sd.InputStream(callback=callback, channels=1, samplerate=samplerate):
-        print(f"Recording for {duration} seconds... ")
-        for _ in range(int(duration * 10)):  # check every 0.1s
+        for _ in range(int(duration * 10)):
             if stop_recording:
-                print("Recording stopped early — discarding audio.")
-                return np.array([])  # Discard if stopped early
+                return np.array([])
             time.sleep(0.1)
             
-    # Combine and return audio if completed
     audio = np.concatenate(recorded_data, axis=0)
     return np.squeeze(audio)
 
