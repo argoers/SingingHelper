@@ -232,7 +232,8 @@ def get_note_info(musicXml_file, start_measure, end_measure, part_name):
 
             for measure in selected_measures:
                 measure_start_offset = measure.offset  
-
+                if len([e for e in measure.voices]) > 0:
+                    measure = measure.voices[0]
                 for element in measure.notes:
                     if isinstance(element, chord.Chord):
                         element = element[-1] 

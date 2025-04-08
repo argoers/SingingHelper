@@ -12,7 +12,7 @@
       <p v-if="selectedFile">
         Fail: <b>{{ selectedFile }}</b>
       </p>
-      <div v-if="fileUploaded">
+      <div v-if="fileUploaded" class="dropdown">
         <label for="partSelect">Partii:</label>
         <select
           id="partSelect"
@@ -278,6 +278,7 @@ export default {
       } catch (error) {
         errorMessage.value = error.message
       }
+      console.log('Fetched notes:', musicXmlNoteInfo.value)
     }
 
     const handleFileUploaded = async (success) => {

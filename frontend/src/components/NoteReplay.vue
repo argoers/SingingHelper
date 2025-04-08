@@ -207,7 +207,7 @@ export default {
         const pitchAtFrame = props.recordedNotes[frameIdx]
 
         ctx.fillStyle =
-          pitchAtFrame <= note.pitch + 0.1 && pitchAtFrame >= note.pitch - 0.051 ? 'green' : 'red'
+          pitchAtFrame <= note.pitch + 0.05 && pitchAtFrame >= note.pitch - 0.05 ? 'green' : 'red'
 
         const barWidth = note.width / note.timeIndexes.length
 

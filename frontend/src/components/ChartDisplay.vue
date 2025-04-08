@@ -58,7 +58,7 @@ export default {
       chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 2
       chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 2
       chartCanvas.value.height = Math.min(
-        800,
+        1000,
         (chartOptions.scales.y.max - chartOptions.scales.y.min) * 30,
       )
     }
@@ -67,7 +67,14 @@ export default {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top' },
+        legend: {
+          position: 'top',
+          labels: {
+            font: {
+              size: 18,
+            },
+          },
+        },
         title: {
           display: true,
           text: '',
@@ -79,6 +86,9 @@ export default {
             autoSkip: false,
             stepSize: 1,
             maxRotation: 0,
+            font: {
+              size: 18,
+            },
             callback: (value, index) =>
               props.chartData.labels[index] ? props.chartData.labels[index] : null,
           },
@@ -87,6 +97,9 @@ export default {
           ticks: {
             autoSkip: false,
             stepSize: 1,
+            font: {
+              size: 18,
+            },
             callback: (value) => midiPitchToNoteWithOctave(value),
           },
         },
