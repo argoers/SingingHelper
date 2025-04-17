@@ -4,7 +4,7 @@ A **Vue + Flask** project designed to assist choir singers in learning their voc
 
 ## Run the Project
 
-Executable files for **Windows and Mac/Linux** are available under **Releases**.
+Executable files for **Windows, macOS and Linux** are available under **Releases**.
 
 ## Modify the Project
 
@@ -12,21 +12,38 @@ Executable files for **Windows and Mac/Linux** are available under **Releases**.
 
 This is a **Vue + Flask** project. You need:
 
-- **Node.js** (for the frontend)
+- **Node.js & NPM** (for the frontend)
 - **Python 3** (for the backend)
 
 ### Create virtual environment for Python
-```sh
-cd backend
-python -m venv venv       # Create virtual environment
-source venv/bin/activate  # Activate (Mac/Linux) OR
-venv\Scripts\activate     # Activate (Windows)
-pip install -r requirements.txt
-```
-### Run backend
+
+#### Windows
 
 ```sh
-python backend/src/app_develop.py         # Run Flask backend
+cd backend
+python -m venv venv    
+venv\Scripts\activate   
+pip install -r requirements.txt
+```
+
+#### macOS/Linux
+```sh
+cd backend
+python3 -m venv venv      
+source venv/bin/activate 
+pip install -r requirements.txt
+```
+
+### Run backend
+
+#### Windows
+```sh
+python src/app_develop.py
+```
+
+#### macOS/Linux
+```sh
+python3 src/app_develop.py
 ```
 
 ### Run frontend
@@ -39,13 +56,13 @@ npm run dev
 
 ## Build project (Virtual environment needs to be active)
 
-### Windows (CMD)
+### Windows
 
 ```sh
 build_win.bat
 ```
 
-### Mac/Linux
+### macOS/Linux
 
 ```sh
 chmod +x ./build_mac.sh

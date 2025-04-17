@@ -2,7 +2,7 @@
   <button v-if="!applicationQuitted" @click="stopServers" class="button">Sulge rakendus</button>
   <p v-if="applicationQuitted">Sulge aken</p>
   <div v-if="!applicationQuitted" class="container">
-    <h2>MusicXML faili ja laulmise võrdlus</h2>
+    <h2>MusicXML-faili ja laulmise võrdlus</h2>
 
     <div class="card">
       <FileUpload
@@ -278,7 +278,6 @@ export default {
       } catch (error) {
         errorMessage.value = error.message
       }
-      console.log('Fetched notes:', musicXmlNoteInfo.value)
     }
 
     const handleFileUploaded = async (success) => {
@@ -286,7 +285,7 @@ export default {
       resetGraphData()
       if (!success) {
         musicXmlNoteInfo.value = null
-        errorMessage.value = 'Vali MusicXML fail!'
+        errorMessage.value = 'Vali MusicXML-fail!'
         return
       }
       startMeasure.value = 1
