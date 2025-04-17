@@ -1,6 +1,7 @@
 # Lõputöö – Singing Helper
 
-A **Vue + Flask** project designed to assist choir singers in learning their vocal parts efficiently.
+A **Vue + Flask** project designed to assist choir singers in learning their vocal parts efficiently.<br><br>
+The application supports only **MusicXML** file import. An example file, **Song.mxl**, is included in the root directory for testing and demonstration purposes.
 
 ## Run the Project
 
@@ -65,6 +66,6 @@ build_win.bat
 ### macOS/Linux
 
 ```sh
-chmod +x ./build_mac.sh
-./build_mac.sh
+chmod +x ./build_linux.sh
+./build_linux.sh
 ```

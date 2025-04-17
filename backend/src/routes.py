@@ -26,7 +26,7 @@ def upload_musicXml():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
     
-    if file.filename.rsplit(".", 1)[1] != "mxl":
+    if file.filename.rsplit(".", 1)[1] not in ["mxl", "musicxml"]:
         return jsonify({"error": "Invalid file type. Please upload a MusicXML file."}), 400
 
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)

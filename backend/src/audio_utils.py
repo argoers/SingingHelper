@@ -37,7 +37,7 @@ def extract_pitches_from_recorded_audio(audio, latency_buffer, samplerate=22050,
         audio = librosa.to_mono(audio)
 
     pitches, _, _ = librosa.pyin(
-        audio, sr=samplerate, hop_length=hop_size
+        audio, fmin=10.772, fmax=samplerate/2, sr=samplerate, hop_length=hop_size
     )
 
     pitches = np.nan_to_num(pitches, nan=0.0)
