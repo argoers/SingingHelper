@@ -13,14 +13,14 @@ export const uploadMusicXml = async (file) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("File upload failed:", data.error);
+      console.error("Ei saanud faili üles laetud:", data.error);
       return false;
     }
 
-    console.log("File uploaded successfully:", data.filename);
+    console.log("Fail edukalt üles laetud:", data.filename);
     return true;
   } catch (error) {
-    console.error("Upload request failed:", error);
+    console.error("Üleslaadimine ei läinud läbi:", error);
     return false;
   }
 };
@@ -33,7 +33,7 @@ export const getMusicXmlStartTimeAndDurationInSeconds = async (startMeasure, end
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch bar range.");
+    throw new Error("Ei saanud serverist algusaja ja kestuse infot.");
   }
   
   return await response.json();
@@ -47,7 +47,7 @@ export const getMusicXmlNoteInfo = async (startMeasure, endMeasure, partName) =>
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch bar range.");
+    throw new Error("Ei saanud serverist MusicXML nootide infot.");
   }
   
   return await response.json();
@@ -64,14 +64,14 @@ export const extractPitchesFromRecordedAudio = async (startMeasure, endMeasure) 
     }
 
     if (!data.live_pitches) {
-      throw new Error("No pitches extracted from the audio.");
+      throw new Error("Ei saanud serverist salvestatud nootide infot.");
     }
 
     const liveTimes = data.live_pitches.map((pitch) => pitch[0]);
     const livePitches = data.live_pitches.map((pitch) => pitch[1]);
 
     if (liveTimes.length === 0) {
-      throw new Error("Please sing into the microphone to extract pitches.");
+      throw new Error("Mikrofon ei suutnud tuvastada heli.");
     }
 
     let numPoints = livePitches.length;
@@ -111,14 +111,14 @@ export const recordAudio = async (startMeasure, endMeasure, speed, partName, lat
 
     return true;
   } catch (error) {
-    throw new Error("Failed to compare singing: " + error.message);
+    throw new Error("Ei saanud heli salvestada: " + error.message);
   }
 };
 
 export const getTempoInfo = async () => {
   const response = await fetch(`${API_BASE_URL}/get-musicXml-tempo-info`);
   if (!response.ok) {
-    throw new Error("Failed to fetch tempo info.");
+    throw new Error("Ei saanud serverist tempo infot.");
   }
   return await response.json();
 };
@@ -131,7 +131,7 @@ export const getMeasureInfo = async (partName) => {
   });
   
   if (!response.ok) {
-    throw new Error("Failed to fetch measure info.");
+    throw new Error("Ei saanud serverist taktide infot.");
   }
   return await response.json();
 };
@@ -144,7 +144,7 @@ export const getTimeSignatureInfo = async (partName) => {
   });
   
   if (!response.ok) {
-    throw new Error("Failed to fetch bar range.");
+    throw new Error("Ei saanud serverist taktimõõtude infot.");
   }
   return await response.json();
 };
@@ -152,7 +152,7 @@ export const getTimeSignatureInfo = async (partName) => {
 export const quitApplication = async () => {
   const response = await fetch(`${API_BASE_URL}/quit-application`);
   if (!response.ok) {
-    throw new Error("Failed to fetch time signature.");
+    throw new Error("Ei saanud rakendust sulgeda.");
   }
   return await response.json();
 };
@@ -160,7 +160,7 @@ export const quitApplication = async () => {
 export const getPartNames = async () => {
   const response = await fetch(`${API_BASE_URL}/get-musicXml-part-names`);
   if (!response.ok) {
-    throw new Error("Failed to fetch part names.");
+    throw new Error("Ei saanud serverist partiide nimesid.");
   }
   return await response.json();
 };
@@ -168,7 +168,7 @@ export const getPartNames = async () => {
 export const cancel = async () => {
   const response = await fetch(`${API_BASE_URL}/end`);
   if (!response.ok) {
-    throw new Error("Failed to end.");
+    throw new Error("Ei saanud salvestamist peatada.");
   }
   return await response.json();
 };

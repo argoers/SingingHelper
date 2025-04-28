@@ -20,20 +20,20 @@ def upload_musicXml():
     global MUSICXML_FILE
 
     if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+        return jsonify({"error": "Faili ei laetud üles."}), 400
 
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "Faili ei valitud."}), 400
     
     if file.filename.rsplit(".", 1)[1] not in ["mxl", "musicxml"]:
-        return jsonify({"error": "Invalid file type. Please upload a MusicXML file."}), 400
+        return jsonify({"error": "Vale failitüüp! Palun vali MusicXML fail (.mxl, .musicxml)."}), 400
 
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(file_path)
     MUSICXML_FILE = file_path
 
-    return jsonify({"message": "MusicXML file uploaded successfully!", "filename": file.filename})
+    return jsonify({"message": "MusicXML fail üles laetud edukalt!", "filename": file.filename})
 
 @api_routes.route("/record-audio", methods=["POST"])
 def record_audio():
@@ -52,7 +52,7 @@ def record_audio():
         DURATION = end_time - start_time
         RECORDED_AUDIO = record_audio_in_time(DURATION + LATENCY_BUFFER)
         
-        return jsonify({"message": "recorded"})
+        return jsonify({"message": "Salvestamine lõpetatud", "f": RECORDED_AUDIO.tolist()})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -61,7 +61,7 @@ def record_audio():
 def end_rec():
     try:
         end()
-        return jsonify({"message": "cancelled"})
+        return jsonify({"message": "Salvestamine katkestatud"})
     except Exception as e:   
         return jsonify({"error": str(e)}), 500
     
@@ -101,7 +101,7 @@ def get_musicXml_time_signature_info():
 @api_routes.get("/quit-application")
 def quit_application():
     threading.Thread(target=shutdown_backend).start()
-    return {"message": "Stopped"}
+    return {"message": "Rakendus suletakse."}
 
 @api_routes.route("/get-musicXml-note-info", methods=["POST"])
 def get_musicXml_note_info():

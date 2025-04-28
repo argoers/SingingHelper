@@ -37,7 +37,7 @@ def get_tempo_info(musicXml_file):
         
     
     except Exception as e:
-        print(f"Error extracting MusicXML tempo: {e}")
+        print(f"Viga tempo info eraldamisel: {e}")
         return 120
     
 def get_measure_info(musicXml_file, part_name):
@@ -80,7 +80,7 @@ def get_measure_info(musicXml_file, part_name):
             return result
 
     except Exception as e:
-        print(f"Error extracting measure info: {e}")
+        print(f"Viga taktide info eraldamisel: {e}")
         return []
 
 def get_time_signature_info(musicXml_file, part_name):
@@ -126,7 +126,7 @@ def get_time_signature_info(musicXml_file, part_name):
 
             
     except Exception as e:
-        print(f"Error extracting MusicXML time signature: {e}")
+        print(f"Viga taktimõõtude info eraldamisel: {e}")
         return 4, 4
 
 def get_end_beat_for_measure(measure_number, time_signatures):
@@ -177,7 +177,7 @@ def find_time_range_for_measures(musicXml_file, start_measure, end_measure, spee
         return start_time, end_time
 
     except Exception as e:
-        print(f"Error finding time range for measures: {e}")
+        print(f"Viga taktide ajavahemiku leidmisel: {e}")
         return 0, 0
 
 def get_end_time_for_beat(beat_offset, tempo_changes):
@@ -263,7 +263,7 @@ def get_note_info(musicXml_file, start_measure, end_measure, part_name):
             return notes
 
     except Exception as e:
-        print(f"Error extracting MusicXML notes: {e}")
+        print(f"Viga MusicXML nootide info eraldamisel: {e}")
         return np.array([])
     
 def get_parts(musicXml_file):
