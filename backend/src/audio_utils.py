@@ -37,7 +37,7 @@ def record_audio_in_time(duration, samplerate=22050):
     return np.squeeze(audio)
 
 # Function to extract pitches from recorded audio
-def extract_pitches_from_recorded_audio(audio, latency_buffer, samplerate=22050, hop_size=256):
+def extract_pitches_from_recorded_audio(audio, latency_buffer, samplerate=22050, hop_size=512):
     if audio is None or len(audio) == 0:
         return np.array([])
 
