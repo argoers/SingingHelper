@@ -1,113 +1,139 @@
 /* Global Music-Themed Styling */
+
+/* Body styling for the main page */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #f8f9fb, #e8ecf4);
-    color: #2c3e50;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  /* Set general font family */
+    background: linear-gradient(135deg, #f8f9fb, #e8ecf4);         /* Soft gradient background */
+    color: #2c3e50;                                                /* Text color */
     margin: 0;
     padding: 0;
-    min-width: 800px;
+    min-width: 800px;                                              /* Minimum width for responsiveness */
 }
 
+/* Styling for headers */
 h1, h2, h3, h4 {
-    font-family: 'Georgia', serif;
-    color: #34495e;
-    margin-bottom: 10px;
+    font-family: 'Georgia', serif;  /* Serif font for headers */
+    color: #34495e;                 /* Dark color for header text */
+    margin-bottom: 10px;            /* Space below the headers */
 }
 
+/* Button styling */
 button {
-    background: #6c5ce7;
-    color: white;
+    background: #6c5ce7;              /* Purple background color */
+    color: white;                     /* White text */
     border: none;
-    border-radius: 12px;
-    padding: 10px 16px;
+    border-radius: 12px;              /* Rounded corners */
+    padding: 10px 16px;               /* Padding around the text */
     font-size: 1rem;
-    transition: background 0.3s ease;
-    cursor: pointer;
+    transition: background 0.3s ease;  /* Smooth background color transition */
+    cursor: pointer;                  /* Pointer cursor on hover */
 }
+
+/* Toggle button styling */
 button.toggle {
-    background: #dfe6e9;
-    color: #2d3436;
-  }
-  button.toggle.active {
-    background: #6c5ce7;
-    color: white;
-  }
+    background: #dfe6e9;              /* Light background color for toggle buttons */
+    color: #2d3436;                   /* Dark text color for toggles */
+}
 
+button.toggle.active {
+    background: #6c5ce7;              /* Active state color */
+    color: white;                     /* White text when active */
+}
+
+/* Hover effect for all buttons */
 button:hover {
-    background: #a29bfe;
+    background: #a29bfe;              /* Lighter purple background on hover */
 }
 
+/* Styling for file input, range input, and select dropdown */
 input[type="file"], input[type="range"], select {
-    padding: 6px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    margin: 6px 0;
-    font-size: 1rem;
+    padding: 6px;                     /* Padding inside the inputs */
+    border-radius: 6px;                /* Rounded corners */
+    border: 1px solid #ccc;           /* Light gray border */
+    margin: 6px 0;                    /* Vertical spacing between inputs */
+    font-size: 1rem;                  /* Font size for inputs */
 }
 
+/* Container for content */
 .container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 20px;
-    min-width: 800px;
+    max-width: 1000px;                 /* Maximum width of the container */
+    margin: 0 auto;                    /* Center the container horizontally */
+    padding: 20px;                     /* Padding inside the container */
+    min-width: 800px;                  /* Minimum width to prevent content from shrinking too much */
 }
 
+/* Card component for wrapping content */
 .card {
-    background: #fdfdff;
-    border-radius: 20px;
-    padding: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);  
-    margin: 20px 0;
+    background: #fdfdff;               /* Light background for the card */
+    border-radius: 20px;                /* Rounded corners */
+    padding: 16px;                      /* Padding inside the card */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Subtle shadow around the card */
+    margin: 20px 0;                    /* Margin between cards */
 }
 
+/* Metronome label styling */
 .metronome {
-    font-size: 1.4rem;
-    font-weight: bold;
-    color: #d63031;
+    font-size: 1.4rem;                  /* Larger font for metronome */
+    font-weight: bold;                  /* Bold font weight */
+    color: #d63031;                     /* Red color for attention */
 }
 
+/* Styling for highlighted note inputs */
 .note-highlight {
-    max-width: 1000px;
-    width: 100%;
-    background: #ffeaa7;
-    border-radius: 6px;
-    padding: 4px 8px;
-    display: inline-block;
-    margin: 2px;
+    max-width: 1000px;                  /* Maximum width for note highlight */
+    width: 100%;                        /* Full width */
+    background: #ffeaa7;                /* Light yellow background */
+    border-radius: 6px;                 /* Rounded corners */
+    padding: 4px 8px;                   /* Padding around the content */
+    display: inline-block;              /* Display as inline-block */
+    margin: 2px;                        /* Small margin between highlights */
 }
 
+/* Chart container with background */
 .chart-container {
-    background: #dfe6e9;
-    padding: 0px;
-    border-radius: 0px;
+    background: #dfe6e9;                /* Light gray background */
+    padding: 0px;                       /* No padding */
+    border-radius: 0px;                 /* No rounded corners */
 }
 
+/* Label styling for form elements */
 label {
-    font-weight: 600;
-    margin-right: 8px;
+    font-weight: 600;                   /* Bold labels */
+    margin-right: 8px;                  /* Space between label and input */
 }
 
+/* Error message styling */
 .error {
-    color: #e74c3c;
-    font-weight: bold;
-    margin-top: 10px;
-    display: block;
+    color: #e74c3c;                     /* Red color for errors */
+    font-weight: bold;                  /* Bold error text */
+    margin-top: 10px;                   /* Top margin for error message */
+    display: block;                     /* Display error as block element */
 }
 
+/* Section title style */
 .section-title {
-    font-size: 1.25rem;
-    margin-bottom: 8px;
-    color: #2d3436;
-  }
-  
-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-    pointer-events: none;
-    background-color: #ccc;
-    color: #666;
+    font-size: 1.25rem;                 /* Slightly larger font for section titles */
+    margin-bottom: 8px;                 /* Space below the title */
+    color: #2d3436;                     /* Dark color for section titles */
 }
 
+/* Disabled button styling */
+button:disabled {
+    cursor: not-allowed;                /* Cursor changes to not-allowed when disabled */
+    opacity: 0.5;                       /* Reduced opacity for disabled buttons */
+    pointer-events: none;               /* Disable any interactions */
+    background-color: #ccc;             /* Light gray background for disabled state */
+    color: #666;                        /* Dark gray text for disabled state */
+}
+
+/* Styling for select elements */
 select {
-    margin-left: 20px;
+    margin-left: 20px;                   /* Space between select and preceding element */
+}
+
+/* Flex layout for input groups */
+.input-group {
+    display: flex;                       /* Flexbox layout */
+    align-items: center;                 /* Center items vertically */
+    gap: 0.5rem;                         /* Small gap between items */
 }

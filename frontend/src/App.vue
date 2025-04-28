@@ -1,17 +1,27 @@
 <template>
+  <!-- Button to stop servers (quits backend) -->
   <button v-if="!applicationQuitted" @click="stopServers" class="button">Sulge rakendus</button>
+
+  <!-- Message shown after application quit -->
   <p v-if="applicationQuitted">Sulge aken</p>
+
+  <!-- Main container, hidden after quitting -->
   <div v-if="!applicationQuitted" class="container">
     <h2>MusicXML-faili ja laulmise võrdlus</h2>
 
+    <!-- Upload MusicXML file -->
     <div class="card">
       <FileUpload
         @file-uploaded="handleFileUploaded"
         :isRecordingProcessActive="isInCountdown || isRecording || isProcessingAudio"
       />
+
+      <!-- Display uploaded file name -->
       <p v-if="selectedFile">
         Fail: <b>{{ selectedFile }}</b>
       </p>
+
+      <!-- Dropdown to select part (e.g., Soprano, Alto) -->
       <div v-if="fileUploaded" class="dropdown">
         <label for="partSelect">Partii:</label>
         <select
@@ -23,9 +33,12 @@
           <option v-for="part in parts" :key="part" :value="part">{{ part }}</option>
         </select>
       </div>
+
+      <!-- Display error if file upload fails -->
       <p v-if="errorMessage && errorMessage.includes('fail')" class="error">{{ errorMessage }}</p>
     </div>
 
+    <!-- Section for selecting measures and metronome control -->
     <div class="card" v-show="selectedPart && musicXmlNoteInfo !== null">
       <MeasureAndSpeedSelection
         :selectedPart="selectedPart"
@@ -36,6 +49,7 @@
         v-model:speed="speed"
       />
 
+      <!-- Enable or disable metronome during singing -->
       <label v-if="selectedPart">
         <input
           type="checkbox"
@@ -46,6 +60,7 @@
       </label>
     </div>
 
+    <!-- Section for recording controls and live visualization -->
     <div class="card" v-show="selectedPart && musicXmlNoteInfo !== null">
       <RecordingControls
         :selectedPart="selectedPart"
@@ -61,10 +76,12 @@
         @play-first-note="playFirstNote"
       />
 
+      <!-- Status messages during recording or audio processing -->
       <p v-if="isRecording">{{ loadingRecordingMessage }}</p>
       <p v-if="isProcessingAudio">{{ loadingProcessingMessage }}</p>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
+      <!-- Visualize MusicXML notes while recording -->
       <NoteVisualization
         v-if="musicXmlNoteInfo"
         :musicXmlNoteInfo="musicXmlNoteInfo"
@@ -77,6 +94,8 @@
         :selectedPart="selectedPart"
       />
     </div>
+
+    <!-- Replay recorded notes vs MusicXML notes -->
     <NoteReplay
       v-if="chartData.datasets[1].data && chartData.datasets[0].data"
       v-show="chartData.datasets[1].data && chartData.datasets[0].data"
@@ -98,6 +117,7 @@
       @stop-replay="stopReplay"
     />
 
+    <!-- Display chart of MusicXML vs recording -->
     <ChartDisplay
       v-if="chartData.labels.length > 0"
       v-show="chartData.labels.length > 0"
@@ -111,16 +131,23 @@
 </template>
 
 <script lang="ts">
+// Import core Vue features
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+
+// Import child components
 import FileUpload from './components/FileUpload.vue'
 import ChartDisplay from './components/ChartDisplay.vue'
 import NoteVisualization from './components/NoteVisualization.vue'
 import NoteReplay from './components/NoteReplay.vue'
+import MeasureAndSpeedSelection from './components/MeasureAndSpeedSelection.vue'
+import RecordingControls from './components/RecordingControls.vue'
+
+// Import composables for reusable logic
 import { useMetronome } from '@/composables/useMetronome'
 import { useRecording } from '@/composables/useRecording'
 import { useNotePlayback } from '@/composables/useNotePlayback'
-import MeasureAndSpeedSelection from './components/MeasureAndSpeedSelection.vue'
-import RecordingControls from './components/RecordingControls.vue'
+
+// Import API functions
 import {
   getMusicXmlNoteInfo,
   getPartNames,
@@ -140,7 +167,10 @@ export default {
     RecordingControls,
   },
   setup() {
+    // Track if application is closed
     const applicationQuitted = ref(false)
+
+    // Stop servers and close frontend window
     const stopServers = async () => {
       try {
         await quitApplication()
@@ -151,6 +181,7 @@ export default {
       applicationQuitted.value = true
     }
 
+    // UI control states
     const isMetronomeEnabled = ref(false)
     const fileUploaded = ref(false)
     const startMeasure = ref(1)
@@ -158,6 +189,10 @@ export default {
     const speed = ref(1)
     const totalMeasures = ref(null)
     const selectedFile = ref('')
+    const parts = ref([])
+    const selectedPart = ref(null)
+
+    // Data storage for music and performance
     const chartData = ref({
       labels: [],
       datasets: [
@@ -179,8 +214,8 @@ export default {
         },
       ],
     })
-    const parts = ref([])
-    const selectedPart = ref(null)
+
+    // Additional state variables
     const timeSignatureInfo = ref([])
     const tempoInfo = ref([])
     const measureInfo = ref(null)
@@ -188,6 +223,7 @@ export default {
     const startTime = ref(null)
     const duration = ref(null)
 
+    // Use metronome logic
     const { buildMetronome, startMetronome, stopMetronome } = useMetronome(
       timeSignatureInfo,
       tempoInfo,
@@ -196,8 +232,10 @@ export default {
       isMetronomeEnabled,
     )
 
+    // Use note playback logic (play first note)
     const { isNoteBeingPlayed, playFirstNote } = useNotePlayback(musicXmlNoteInfo)
 
+    // Use recording logic (record + analyze audio)
     const {
       isInCountdown,
       isRecording,
@@ -234,15 +272,16 @@ export default {
       setError: (e) => (errorMessage.value = e),
     })
 
+    // Reset chart data to empty
     const resetGraphData = () => {
-      chartData.value.labels = {}
+      chartData.value.labels = []
       chartData.value.datasets[0].data = null
       chartData.value.datasets[1].data = null
     }
 
+    // Fetch measure info, tempo info, time signatures and notes
     const fetchInfo = async () => {
       resetGraphData()
-
       try {
         const response = await getMeasureInfo(selectedPart.value)
         measureInfo.value = response.measure_info
@@ -267,6 +306,7 @@ export default {
       fetchNotes()
     }
 
+    // Fetch MusicXML notes for selected measures
     const fetchNotes = async () => {
       try {
         const response = await getMusicXmlNoteInfo(
@@ -280,6 +320,7 @@ export default {
       }
     }
 
+    // Handle file upload result
     const handleFileUploaded = async (success) => {
       fileUploaded.value = success
       resetGraphData()
@@ -298,22 +339,25 @@ export default {
       }
     }
 
-    onMounted(() => {
-      window.addEventListener('click', clearError)
-    })
-
-    onBeforeUnmount(() => {
-      window.removeEventListener('click', clearError)
-    })
-
-    watch([startMeasure, endMeasure], () => {
-      fetchNotes()
-    })
-
+    // Clear errors when clicking anywhere
     const clearError = () => {
       errorMessage.value = null
     }
 
+    // Setup window event listeners
+    onMounted(() => {
+      window.addEventListener('click', clearError)
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('click', clearError)
+    })
+
+    // Refetch notes when measure selection changes
+    watch([startMeasure, endMeasure], () => {
+      fetchNotes()
+    })
+
+    // Return everything to template
     return {
       applicationQuitted,
       stopServers,

@@ -5,7 +5,7 @@ The application supports only **MusicXML** file import. An example file, **Song.
 
 ## Run the Project
 
-Executable files for **Windows, macOS and Linux** are available under **Releases**.
+Executable files for **Windows and macOS** are available under **Releases**.
 
 ## Modify the Project
 
@@ -18,7 +18,7 @@ This is a **Vue + Flask** project. You need:
 
 ### Create virtual environment for Python
 
-#### Windows
+#### Windows (CMD)
 
 ```sh
 cd backend
@@ -27,7 +27,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-#### macOS/Linux
+#### macOS
 ```sh
 cd backend
 python3 -m venv venv      
@@ -37,12 +37,12 @@ pip install -r requirements.txt
 
 ### Run backend
 
-#### Windows
+#### Windows (CMD)
 ```sh
 python src/app_develop.py
 ```
 
-#### macOS/Linux
+#### macOS
 ```sh
 python3 src/app_develop.py
 ```
@@ -57,15 +57,15 @@ npm run dev
 
 ## Build project (Virtual environment needs to be active)
 
-### Windows
+### Windows (CMD)
 
 ```sh
 build_win.bat
 ```
 
-### macOS/Linux
+### macOS
 
 ```sh
-chmod +x ./build_linux.sh
+chmod +x ./build_mac.sh
 ./build_linux.sh
 ```
