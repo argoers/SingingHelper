@@ -59,7 +59,7 @@ export default {
     let maxNotePitch = Math.max(...props.musicXmlNoteInfo.map((e) => e.pitch))
 
     // Elapsed beats during recording
-    let elapsedBeats = 0
+    let elapsedBeats
 
     // Start beat (offset for first note)
     let startBeat = 0
@@ -148,9 +148,11 @@ export default {
       // Filter notes that would be drawn off-screen
       notes = notes.filter((note) => note.x < firstNotePositionX + lastNoteEndBeat * pxPerBeat)
 
+      // Reset elapsed beats to start position
+      elapsedBeats = startBeat
+
       // If recording, restart animation
       if (props.isRecording) {
-        elapsedBeats = 0
         lastFrameTime = performance.now()
         requestAnimationFrame(animate)
       }
@@ -209,7 +211,7 @@ export default {
 
       // Stop animation if end is reached
       if (elapsedBeats >= lastNoteEndBeat) {
-        elapsedBeats = 0
+        elapsedBeats = startBeat
         cancelAnimationFrame(animationFrameId)
         return
       }
@@ -233,7 +235,7 @@ export default {
       drawPlayhead(firstNotePositionX, true) // Main start line
       measureBeats.forEach((beat) => {
         let x
-        if (elapsedBeats == 0) {
+        if (elapsedBeats == startBeat) {
           x = firstNotePositionX + (beat - startBeat) * pxPerBeat
         } else {
           x = firstNotePositionX + (beat - elapsedBeats) * pxPerBeat
