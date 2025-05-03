@@ -40,6 +40,7 @@
 <script lang="ts">
 // Import Vue Composition API features
 import { ref, watch, defineComponent, onMounted } from 'vue'
+import { getCurrentTempo, getWhichBeatMeasureEndsWith } from '../utils/animationUtils'
 
 export default defineComponent({
   // Define props passed from parent
@@ -50,6 +51,8 @@ export default defineComponent({
     speed: Number, // Playback speed (as multiplier, e.g., 1.0)
     disabled: Boolean, // Whether inputs are disabled
     totalMeasures: Number, // Total measures available in the song
+    tempoInfo: Object, // Current tempo in BPM
+    timeSignatureInfo: Object, // Time signature changes
   },
   emits: [
     'update:startMeasure', // Emit updated start measure
@@ -100,6 +103,8 @@ export default defineComponent({
           startMeasureInput.value = String(props.totalMeasures)
           emit('update:startMeasure', props.totalMeasures)
         } else {
+          endMeasureInput.value = String(parsed)
+          emit('update:endMeasure', parsed)
           startMeasureInput.value = String(parsed)
           emit('update:startMeasure', parsed)
         }
@@ -139,7 +144,19 @@ export default defineComponent({
     // Validate and sanitize speed input
     const sanitizeSpeed = () => {
       const parsed = Math.round(parseFloat(speedInput.value))
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 1000) {
+
+      // Calculate the start beat based on the start measure
+      const startBeat = getWhichBeatMeasureEndsWith(
+        parseInt(startMeasureInput.value) - 1,
+        props.timeSignatureInfo,
+      )
+      // Check if parsed speed is valid and within limits
+      if (
+        !isNaN(parsed) &&
+        parsed > 0 &&
+        getCurrentTempo(startBeat, props.tempoInfo, parsed / 100, startMeasureInput.value) <= 300
+      ) {
+        // If valid, update speed and emit event
         speedInput.value = String(parsed)
         emit('update:speed', parsed / 100)
       } else {

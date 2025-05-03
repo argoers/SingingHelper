@@ -13,6 +13,8 @@ import { ref, onMounted, watch, nextTick } from 'vue'
 // Import helper functions for animation logic
 import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
+import { useNotePlayback } from '@/composables/useNotePlayback'
+
 export default {
   props: {
     // MusicXML note data
@@ -31,8 +33,15 @@ export default {
     timeSignatureInfo: Object,
     // Selected voice part (e.g., Soprano)
     selectedPart: String,
+    // Whether the snippet is being played
+    isPlayingSnippet: Boolean,
+    // Whether the snippet is being recorded
+    isInTheMiddleOfSnippet: Boolean,
+    // Whether the recording is in countdown
+    isInCountdown: Boolean,
   },
-  setup(props) {
+  emits: ['toggle-snippet-play', 'update-in-the-middle-of-snippet', 'reset-snippet'],
+  setup(props, { emit }) {
     // Canvas DOM element
     const canvas = ref(null)
 
@@ -67,6 +76,9 @@ export default {
     // Timestamp of last animation frame
     let lastFrameTime = performance.now()
 
+    // Notes that can be played
+    const playableNotes = ref([])
+
     // Setup notes when component mounts
     onMounted(() => {
       nextTick(() => {
@@ -74,6 +86,16 @@ export default {
         window.addEventListener('resize', setUpNotes)
       })
     })
+
+    watch(
+      () => props.isInCountdown,
+      (isInCountdown) => {
+        if (isInCountdown) {
+          setUpNotes()
+          emit('update-in-the-middle-of-snippet')
+        }
+      },
+    )
 
     // Watch when recording starts/stops
     watch(
@@ -88,6 +110,21 @@ export default {
           // Stop animation when recording stops
           cancelAnimationFrame(animationFrameId)
           setUpNotes()
+        }
+      },
+    )
+
+    // Watch when snippet is playing
+    watch(
+      () => props.isPlayingSnippet,
+      (isPlayingSnippet) => {
+        if (isPlayingSnippet) {
+          // Start animation
+          lastFrameTime = performance.now()
+          requestAnimationFrame(animate)
+        } else {
+          // Stop animation when recording stops
+          cancelAnimationFrame(animationFrameId)
         }
       },
     )
@@ -163,7 +200,7 @@ export default {
 
     // Animate function for note scrolling
     const animate = (timestamp) => {
-      if (!props.isRecording) return
+      if (!props.isRecording && !props.isPlayingSnippet) return
 
       // Clear entire canvas
       ctx.clearRect(0, 0, canvas.value.width, canvas.value.height)
@@ -197,8 +234,16 @@ export default {
         elapsedBeats += beatsThisFrame
       }
 
+      if (!props.isInTheMiddleOfSnippet && !props.isRecording) {
+        emit('update-in-the-middle-of-snippet')
+      }
+
       // Scroll amount in pixels
       const scrollAmount = beatsThisFrame * pxPerBeat
+
+      if (!props.isRecording) {
+        playableNotes.value = notes.filter((note) => note.x + note.width > firstNotePositionX)
+      }
 
       // Move notes leftward and redraw them
       notes.forEach((note) => {
@@ -206,12 +251,24 @@ export default {
         note.x -= scrollAmount
       })
 
+      if (!props.isRecording) {
+        playableNotes.value = notes.filter((note) => note.x + note.width > firstNotePositionX)
+      }
+
       // Remove notes that scrolled off the canvas
       notes = notes.filter((note) => note.x + note.width > 0)
 
       // Stop animation if end is reached
       if (elapsedBeats >= lastNoteEndBeat) {
         elapsedBeats = startBeat
+
+        // If not recording, stop and reset snippet
+        if (!props.isRecording) {
+          setUpNotes()
+          emit('toggle-snippet-play')
+          emit('update-in-the-middle-of-snippet')
+        }
+
         cancelAnimationFrame(animationFrameId)
         return
       }
@@ -279,6 +336,35 @@ export default {
     watch([() => props.startMeasure, () => props.endMeasure, () => props.musicXmlNoteInfo], () => {
       setUpNotes()
     })
+
+    const { isNoteBeingPlayed, playNote } = useNotePlayback(props.musicXmlNoteInfo)
+
+    // Watch for changes in playableNotes to trigger playback
+    watch(
+      [() => playableNotes.value.length, () => props.isPlayingSnippet], // Watch the value of playableNotes
+      () => {
+        // If there are playable notes and isPlayingSnippet is true, play the first note
+        // Otherwise, stop playback
+        if (props.isPlayingSnippet) {
+          playNote(playableNotes.value, true)
+        } else {
+          playNote([])
+        }
+      },
+    )
+
+    // Watch for changes in isInTheMiddleOfSnippet to reset elapsedBeats
+    watch(
+      () => props.isInTheMiddleOfSnippet,
+      (isInTheMiddleOfSnippet) => {
+        // If not in the middle of a snippet, reset elapsedBeats
+        // and set up notes again
+        if (!isInTheMiddleOfSnippet) {
+          elapsedBeats = startBeat
+          setUpNotes()
+        }
+      },
+    )
 
     // Return canvas reference
     return { canvas }

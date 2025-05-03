@@ -44,6 +44,8 @@
         :selectedPart="selectedPart"
         :disabled="isInCountdown || isRecording || isProcessingAudio"
         :totalMeasures="totalMeasures"
+        :tempoInfo="tempoInfo"
+        :timeSignatureInfo="timeSignatureInfo"
         v-model:startMeasure="startMeasure"
         v-model:endMeasure="endMeasure"
         v-model:speed="speed"
@@ -71,9 +73,13 @@
         :countdown="countdown"
         :disabled="isInCountdown || isRecording || isProcessingAudio"
         :musicXmlNoteInfo="musicXmlNoteInfo"
+        :isSnippetPlaying="isPlayingSnippet"
+        :isInTheMiddleOfSnippet="isInTheMiddleOfSnippet"
         @start-recording="startRecordingProcess"
         @cancel-recording="cancelRecordingProcess"
-        @play-first-note="playFirstNote"
+        @play-first-note="playNote(musicXmlNoteInfo, false)"
+        @toggle-snippet-play="playSnippet"
+        @reset-snippet="updateInTheMiddleOfSnippet"
       />
 
       <!-- Status messages during recording or audio processing -->
@@ -92,6 +98,11 @@
         :tempoInfo="tempoInfo"
         :timeSignatureInfo="timeSignatureInfo"
         :selectedPart="selectedPart"
+        :isPlayingSnippet="isPlayingSnippet"
+        :isInTheMiddleOfSnippet="isInTheMiddleOfSnippet"
+        :isInCountdown="isInCountdown"
+        @toggle-snippet-play="playSnippet"
+        @update-in-the-middle-of-snippet="updateInTheMiddleOfSnippet"
       />
     </div>
 
@@ -181,6 +192,19 @@ export default {
       applicationQuitted.value = true
     }
 
+    const isPlayingSnippet = ref(false)
+    const playSnippet = () => {
+      // Logic to play a snippet of the music
+      isPlayingSnippet.value = !isPlayingSnippet.value
+    }
+
+    // Track if the user is in the middle of a snippet
+    const isInTheMiddleOfSnippet = ref(false)
+    const updateInTheMiddleOfSnippet = () => {
+      // Logic to update the state of being in the middle of a snippet
+      isInTheMiddleOfSnippet.value = !isInTheMiddleOfSnippet.value
+    }
+
     // UI control states
     const isMetronomeEnabled = ref(false)
     const fileUploaded = ref(false)
@@ -233,7 +257,7 @@ export default {
     )
 
     // Use note playback logic (play first note)
-    const { isNoteBeingPlayed, playFirstNote } = useNotePlayback(musicXmlNoteInfo)
+    const { isNoteBeingPlayed, playNote } = useNotePlayback()
 
     // Use recording logic (record + analyze audio)
     const {
@@ -372,7 +396,11 @@ export default {
       speed,
       totalMeasures,
       isMetronomeEnabled,
-      playFirstNote,
+      playNote,
+      playSnippet,
+      isPlayingSnippet,
+      updateInTheMiddleOfSnippet,
+      isInTheMiddleOfSnippet,
       isNoteBeingPlayed,
       startRecordingProcess,
       cancelRecordingProcess,

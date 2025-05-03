@@ -1,57 +1,49 @@
 import { ref } from 'vue'
+import Soundfont from 'soundfont-player'
 
-export function useNotePlayback(midiNotesRef) {
+export function useNotePlayback() {
   // Reactive state to track if a note is being played
   const isNoteBeingPlayed = ref(false)
+  // Variable to store the current oscillator
+  let currentNote = null
 
-  // Function to play the first note in the midiNotes array
-  const playFirstNote = () => {
-    const midiNotes = midiNotesRef.value // Get the MIDI notes array
-    if (!midiNotes || midiNotes.length === 0) return // Exit if there are no notes
+  // Variable to store the current audio context
+  let player = null
+
+  // Create a new audio context for playback
+  const audioCtx = new window.AudioContext()
+
+  // Function to load the instrument soundfont
+  const loadInstrument = async () => {
+    player = await Soundfont.instrument(audioCtx, 'choir_aahs')
+  }
+
+  // Function to play a note using the Soundfont player
+  const playNote = async (midiNotes, isSnippet) => {
+    if (!player) await loadInstrument()
+
+    // If there was a previous note, stop it
+    if (currentNote) currentNote.stop()
+
+    // If there are no MIDI notes, exit the function
+    if (!midiNotes || midiNotes.length === 0) return
 
     // Get the pitch (MIDI note number) of the first note
-    const firstNoteFrequency = midiNotes[0].pitch
-
-    // Convert MIDI note number to frequency (in Hz) for playback
-    const frequencyHz = 440 * Math.pow(2, (firstNoteFrequency - 69) / 12)
-
-    // Create a new audio context for playback
-    const audioCtx = new window.AudioContext()
-
-    // Create an oscillator to generate a sound wave at the calculated frequency
-    const oscillator = audioCtx.createOscillator()
-
-    // Create a gain node to control the volume of the sound
-    const gainNode = audioCtx.createGain()
-
-    // Set the frequency of the oscillator to the calculated frequency
-    oscillator.frequency.setValueAtTime(frequencyHz, audioCtx.currentTime)
-
-    // Set the gain (volume) of the sound to 1 (full volume)
-    gainNode.gain.setValueAtTime(1, audioCtx.currentTime)
-
-    // Connect the oscillator to the gain node and the gain node to the audio context's output
-    oscillator.connect(gainNode)
-    gainNode.connect(audioCtx.destination)
-
-    // Start the oscillator (playing the sound)
-    oscillator.start()
-
-    // Mark that a note is being played
     isNoteBeingPlayed.value = true
+    const midiNote = midiNotes[0].pitch
+    const duration = isSnippet ? 1000 : 2 // seconds
+     
+    currentNote = player.play(midiNote, audioCtx.currentTime, { duration })
 
-    // Stop the oscillator after 2 seconds (duration of the note)
-    oscillator.stop(audioCtx.currentTime + 2)
-
-    // When the note stops, update the state to indicate that no note is being played
-    oscillator.onended = () => {
+    setTimeout(() => {
       isNoteBeingPlayed.value = false
-    }
+    }, duration * 1000)
   }
+
 
   // Return the state and function so they can be used in other parts of the application
   return {
     isNoteBeingPlayed, // Indicates if a note is being played
-    playFirstNote, // Function to play the first note
+    playNote, // Function to play the first note
   }
 }
