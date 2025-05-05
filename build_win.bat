@@ -3,7 +3,7 @@
 
 cd frontend
 :: Change directory into the 'frontend' folder
-
+call npm install
 :: Build the frontend project using npm
 call npm run build
 :: 'call' is used so that after 'npm run build' finishes, the script continues

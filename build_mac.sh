@@ -29,6 +29,7 @@ cp favicon.iconset/icon_512x512.png favicon.iconset/icon_512x512@2x.png
 iconutil -c icns favicon.iconset
 
 # Build the frontend project with npm
+npm install
 npm run build
 # Produces production-ready files into 'frontend/dist'
 
