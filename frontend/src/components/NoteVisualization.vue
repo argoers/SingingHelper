@@ -13,8 +13,6 @@ import { ref, onMounted, watch, nextTick } from 'vue'
 // Import helper functions for animation logic
 import { getWhichBeatMeasureEndsWith, getCurrentTempo, getYPosition } from '../utils/animationUtils'
 
-import { useNotePlayback } from '@/composables/useNotePlayback'
-
 export default {
   props: {
     // MusicXML note data
@@ -39,6 +37,8 @@ export default {
     isInTheMiddleOfSnippet: Boolean,
     // Whether the recording is in countdown
     isInCountdown: Boolean,
+    // Function to play a note
+    playNote: Function,
   },
   emits: ['toggle-snippet-play', 'update-in-the-middle-of-snippet', 'reset-snippet'],
   setup(props, { emit }) {
@@ -87,32 +87,21 @@ export default {
       })
     })
 
-    watch(
-      () => props.isInCountdown,
-      (isInCountdown) => {
-        if (isInCountdown) {
-          setUpNotes()
-          emit('update-in-the-middle-of-snippet')
-        }
-      },
-    )
-
     // Watch when recording starts/stops
-    watch(
-      () => props.isRecording,
-      (isRecording) => {
-        if (isRecording) {
-          // Reset elapsed beats and start animation
-          elapsedBeats = startBeat
-          lastFrameTime = performance.now()
-          requestAnimationFrame(animate)
-        } else {
-          // Stop animation when recording stops
-          cancelAnimationFrame(animationFrameId)
-          setUpNotes()
-        }
-      },
-    )
+    watch([() => props.isRecording, () => props.isInCountdown], ([isRecording, isInCountdown]) => {
+      if (isRecording && !isInCountdown) {
+        // Reset elapsed beats and start animation
+        setUpNotes()
+        emit('update-in-the-middle-of-snippet', false)
+        elapsedBeats = startBeat
+        lastFrameTime = performance.now()
+        requestAnimationFrame(animate)
+      } else {
+        // Stop animation when recording stops or countdown is active
+        cancelAnimationFrame(animationFrameId)
+        setUpNotes()
+      }
+    })
 
     // Watch when snippet is playing
     watch(
@@ -189,7 +178,7 @@ export default {
       elapsedBeats = startBeat
 
       // If recording, restart animation
-      if (props.isRecording) {
+      if (props.isRecording && !props.isInCountdown) {
         lastFrameTime = performance.now()
         requestAnimationFrame(animate)
       }
@@ -213,12 +202,7 @@ export default {
       lastFrameTime = timestamp
 
       // Get current tempo (BPM) adjusted for speed
-      const currentTempo = getCurrentTempo(
-        elapsedBeats,
-        props.tempoInfo,
-        props.speed,
-        props.startMeasure,
-      )
+      const currentTempo = getCurrentTempo(elapsedBeats, props.tempoInfo, props.speed, startBeat)
 
       // Calculate beats per second
       const beatsPerSecond = currentTempo / 60
@@ -235,7 +219,7 @@ export default {
       }
 
       if (!props.isInTheMiddleOfSnippet && !props.isRecording) {
-        emit('update-in-the-middle-of-snippet')
+        emit('update-in-the-middle-of-snippet', true)
       }
 
       // Scroll amount in pixels
@@ -266,7 +250,7 @@ export default {
         if (!props.isRecording) {
           setUpNotes()
           emit('toggle-snippet-play')
-          emit('update-in-the-middle-of-snippet')
+          emit('update-in-the-middle-of-snippet', false)
         }
 
         cancelAnimationFrame(animationFrameId)
@@ -337,8 +321,6 @@ export default {
       setUpNotes()
     })
 
-    const { isNoteBeingPlayed, playNote } = useNotePlayback(props.musicXmlNoteInfo)
-
     // Watch for changes in playableNotes to trigger playback
     watch(
       [() => playableNotes.value.length, () => props.isPlayingSnippet], // Watch the value of playableNotes
@@ -346,9 +328,9 @@ export default {
         // If there are playable notes and isPlayingSnippet is true, play the first note
         // Otherwise, stop playback
         if (props.isPlayingSnippet) {
-          playNote(playableNotes.value, true)
+          props.playNote(playableNotes.value, true)
         } else {
-          playNote([])
+          props.playNote([])
         }
       },
     )

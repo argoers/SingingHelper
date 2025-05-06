@@ -30,8 +30,9 @@ export const getWhichBeatMeasureEndsWith = (measureNumber, timeSignatureInfo) =>
 }
 
 // Function to get the tempo (BPM) at a specific beat considering the tempo changes
-export const getCurrentTempo = (beat, tempoInfo, speed, startMeasure) => {
-  const absoluteBeat = beat + startMeasure // Add startMeasure to get the absolute beat number
+export const getCurrentTempo = (beat, tempoInfo, speed, startMeasureBeat) => {
+  beat = Math.round(beat / 0.0625) * 0.0625
+  const absoluteBeat = beat + startMeasureBeat // Add startMeasure to get the absolute beat number
   let currentTempo = tempoInfo[0].bpm // Default to the first tempo in the list
 
   // Loop through the tempo information to find the current tempo at the given beat

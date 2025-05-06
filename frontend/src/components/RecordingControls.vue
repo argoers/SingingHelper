@@ -10,13 +10,19 @@
       <button
         @click="$emit('start-recording')"
         :disabled="disabled || isNoteBeingPlayed || isSnippetPlaying"
-        v-if="selectedPart"
+        v-if="selectedPart && !isSettingUpMicrophone"
       >
         {{
           isInCountdown && countdown > 0
             ? `Salvestamine algab ${countdown}...`
             : 'Alusta salvestamist'
         }}
+      </button>
+      <button
+        :disabled="disabled || isNoteBeingPlayed || isSnippetPlaying"
+        v-show="isSettingUpMicrophone"
+      >
+        Sean valmis mikrofoni...
       </button>
 
       <!-- Button to cancel (stop) recording -->
@@ -86,6 +92,7 @@ export default {
     musicXmlNoteInfo: Object, // Notes extracted from MusicXML
     isSnippetPlaying: Boolean, // Is snippet playing
     isInTheMiddleOfSnippet: Boolean, // Is in the middle of a snippet
+    isSettingUpMicrophone: Boolean, // Is microphone setup
   },
 
   // Events emitted upwards to parent

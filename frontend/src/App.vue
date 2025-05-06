@@ -1,6 +1,8 @@
 <template>
   <!-- Button to stop servers (quits backend) -->
-  <button v-if="!applicationQuitted" @click="stopServers" class="button">Sulge rakendus</button>
+  <div class="close-button">
+    <button v-if="!applicationQuitted" @click="stopServers" class="button">Sulge rakendus</button>
+  </div>
 
   <!-- Message shown after application quit -->
   <p v-if="applicationQuitted">Sulge aken</p>
@@ -13,7 +15,9 @@
     <div class="card">
       <FileUpload
         @file-uploaded="handleFileUploaded"
-        :isRecordingProcessActive="isInCountdown || isRecording || isProcessingAudio"
+        :isRecordingProcessActive="
+          isInCountdown || isRecording || isProcessingAudio || isPlayingSnippet
+        "
       />
 
       <!-- Display uploaded file name -->
@@ -28,7 +32,7 @@
           id="partSelect"
           v-model="selectedPart"
           @change="fetchInfo"
-          :disabled="isInCountdown || isRecording || isProcessingAudio"
+          :disabled="isInCountdown || isRecording || isProcessingAudio || isPlayingSnippet"
         >
           <option v-for="part in parts" :key="part" :value="part">{{ part }}</option>
         </select>
@@ -42,7 +46,7 @@
     <div class="card" v-show="selectedPart && musicXmlNoteInfo !== null">
       <MeasureAndSpeedSelection
         :selectedPart="selectedPart"
-        :disabled="isInCountdown || isRecording || isProcessingAudio"
+        :disabled="isInCountdown || isRecording || isProcessingAudio || isPlayingSnippet"
         :totalMeasures="totalMeasures"
         :tempoInfo="tempoInfo"
         :timeSignatureInfo="timeSignatureInfo"
@@ -68,22 +72,23 @@
         :selectedPart="selectedPart"
         :isRecording="isRecording"
         :isProcessingAudio="isProcessingAudio"
-        :isNoteBeingPlayed="isNoteBeingPlayed"
+        :isNoteBeingPlayed="isNoteBeingPlayed.value"
         :isInCountdown="isInCountdown"
         :countdown="countdown"
         :disabled="isInCountdown || isRecording || isProcessingAudio"
         :musicXmlNoteInfo="musicXmlNoteInfo"
         :isSnippetPlaying="isPlayingSnippet"
         :isInTheMiddleOfSnippet="isInTheMiddleOfSnippet"
+        :isSettingUpMicrophone="isSettingUpMicrophone"
         @start-recording="startRecordingProcess"
         @cancel-recording="cancelRecordingProcess"
         @play-first-note="playNote(musicXmlNoteInfo, false)"
         @toggle-snippet-play="playSnippet"
-        @reset-snippet="updateInTheMiddleOfSnippet"
+        @reset-snippet="updateInTheMiddleOfSnippet(false)"
       />
 
       <!-- Status messages during recording or audio processing -->
-      <p v-if="isRecording">{{ loadingRecordingMessage }}</p>
+      <p v-if="isRecording && !isInCountdown">{{ loadingRecordingMessage }}</p>
       <p v-if="isProcessingAudio">{{ loadingProcessingMessage }}</p>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
@@ -101,6 +106,7 @@
         :isPlayingSnippet="isPlayingSnippet"
         :isInTheMiddleOfSnippet="isInTheMiddleOfSnippet"
         :isInCountdown="isInCountdown"
+        :playNote="playNote"
         @toggle-snippet-play="playSnippet"
         @update-in-the-middle-of-snippet="updateInTheMiddleOfSnippet"
       />
@@ -158,6 +164,9 @@ import { useMetronome } from '@/composables/useMetronome'
 import { useRecording } from '@/composables/useRecording'
 import { useNotePlayback } from '@/composables/useNotePlayback'
 
+// Import external libraries
+import Soundfont from 'soundfont-player'
+
 // Import API functions
 import {
   getMusicXmlNoteInfo,
@@ -200,9 +209,9 @@ export default {
 
     // Track if the user is in the middle of a snippet
     const isInTheMiddleOfSnippet = ref(false)
-    const updateInTheMiddleOfSnippet = () => {
+    const updateInTheMiddleOfSnippet = (val) => {
       // Logic to update the state of being in the middle of a snippet
-      isInTheMiddleOfSnippet.value = !isInTheMiddleOfSnippet.value
+      isInTheMiddleOfSnippet.value = val
     }
 
     // UI control states
@@ -256,15 +265,13 @@ export default {
       isMetronomeEnabled,
     )
 
-    // Use note playback logic (play first note)
-    const { isNoteBeingPlayed, playNote } = useNotePlayback()
-
     // Use recording logic (record + analyze audio)
     const {
       isInCountdown,
       isRecording,
       isProcessingAudio,
       isRecordingCancelled,
+      isSettingUpMicrophone,
       countdown,
       showChart,
       showReplay,
@@ -368,8 +375,16 @@ export default {
       errorMessage.value = null
     }
 
+    const playNote = ref<() => void>()
+    const isNoteBeingPlayed = ref(false)
     // Setup window event listeners
-    onMounted(() => {
+    onMounted(async () => {
+      // Create a new audio context for playback
+      const audioCtx = new window.AudioContext()
+      const player = await Soundfont.instrument(audioCtx, 'choir_aahs')
+      const playback = useNotePlayback(audioCtx, player)
+      isNoteBeingPlayed.value = playback.isNoteBeingPlayed
+      playNote.value = playback.playNote
       window.addEventListener('click', clearError)
     })
     onBeforeUnmount(() => {
@@ -409,6 +424,7 @@ export default {
       isRecording,
       isProcessingAudio,
       isRecordingCancelled,
+      isSettingUpMicrophone,
       errorMessage,
       chartData,
       showChart,

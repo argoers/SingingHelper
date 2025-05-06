@@ -63,6 +63,11 @@ export default {
     // Reference to the canvas element for drawing the chart
     const chartCanvas = ref(null)
 
+    // Maximum height for the chart canvas
+    const maxChartHeight = 800
+    // Default font size for y-axis ticks
+    const defaultFontSizeY = 18
+
     // Variable to store the chart instance
     let chartInstance = null
 
@@ -78,11 +83,14 @@ export default {
       chartOptions.scales.y.min = Math.floor(Math.min(...allPitches)) - 2
       chartOptions.scales.y.max = Math.ceil(Math.max(...allPitches)) + 2
 
+      const heightBasedOnTicks = (chartOptions.scales.y.max - chartOptions.scales.y.min) * 15 + 160
+
       // Adjust canvas height based on pitch range
-      chartCanvas.value.height = Math.min(
-        1000,
-        (chartOptions.scales.y.max - chartOptions.scales.y.min) * 30,
-      )
+      chartCanvas.value.height = Math.min(maxChartHeight, heightBasedOnTicks)
+      chartOptions.scales.y.ticks.font.size = Math.min(
+        (maxChartHeight / heightBasedOnTicks) * defaultFontSizeY,
+        defaultFontSizeY,
+      ) // Set font size based on canvas height
     }
 
     // Chart options (customization for axes, plugins, etc.)
@@ -93,7 +101,7 @@ export default {
         legend: {
           position: 'top',
           labels: {
-            font: { size: 18 },
+            font: { size: 16 },
           },
         },
         title: {
@@ -116,7 +124,7 @@ export default {
           ticks: {
             autoSkip: false,
             stepSize: 1,
-            font: { size: 18 },
+            font: {},
             callback: (value) => midiPitchToNoteWithOctave(value), // Convert midi pitch to note names
           },
         },

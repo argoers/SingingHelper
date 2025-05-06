@@ -226,7 +226,7 @@ export default {
         replayTime.value,
         props.tempoInfo,
         props.speed,
-        props.startMeasure,
+        startBeat,
       )
 
       const beatsPerSecond = currentTempo / 60

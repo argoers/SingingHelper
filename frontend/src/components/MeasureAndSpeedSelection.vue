@@ -103,8 +103,11 @@ export default defineComponent({
           startMeasureInput.value = String(props.totalMeasures)
           emit('update:startMeasure', props.totalMeasures)
         } else {
-          endMeasureInput.value = String(parsed)
-          emit('update:endMeasure', parsed)
+          if (parsed > props.endMeasure) {
+            // If start is after end, set end to start
+            endMeasureInput.value = String(parsed)
+            emit('update:endMeasure', parsed)
+          }
           startMeasureInput.value = String(parsed)
           emit('update:startMeasure', parsed)
         }
@@ -113,6 +116,7 @@ export default defineComponent({
         startMeasureInput.value = '1'
         emit('update:startMeasure', 1)
       }
+      sanitizeSpeed()
     }
 
     // Validate and sanitize end measure input
@@ -139,6 +143,7 @@ export default defineComponent({
         endMeasureInput.value = String(props.totalMeasures)
         emit('update:endMeasure', props.totalMeasures)
       }
+      sanitizeSpeed()
     }
 
     // Validate and sanitize speed input
@@ -150,15 +155,23 @@ export default defineComponent({
         parseInt(startMeasureInput.value) - 1,
         props.timeSignatureInfo,
       )
+
+      const tempoForParsedSpeed = getCurrentTempo(0, props.tempoInfo, parsed / 100, startBeat)
       // Check if parsed speed is valid and within limits
-      if (
-        !isNaN(parsed) &&
-        parsed > 0 &&
-        getCurrentTempo(startBeat, props.tempoInfo, parsed / 100, startMeasureInput.value) <= 300
-      ) {
+      if (!isNaN(parsed) && parsed > 0) {
         // If valid, update speed and emit event
-        speedInput.value = String(parsed)
-        emit('update:speed', parsed / 100)
+        if (tempoForParsedSpeed <= 300) {
+          speedInput.value = String(parsed)
+          emit('update:speed', parsed / 100)
+        } else {
+          // Too fast: clamp to max allowed speed
+          const maxAllowedSpeed = Math.floor(
+            (300 / getCurrentTempo(0, props.tempoInfo, 1, startBeat)) * 100,
+          )
+          speedInput.value = String(maxAllowedSpeed)
+          emit('update:speed', maxAllowedSpeed / 100)
+          //alert('Speed too high, clamped to ' + maxAllowedSpeed + '%' + ' (300 BPM)')
+        }
       } else {
         // Default to 100% if invalid
         speedInput.value = '100'

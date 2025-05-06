@@ -33,6 +33,7 @@ export function useRecording({
   const showChart = ref(false) // Whether to show the chart
   const showReplay = ref(false) // Whether to show the replay controls
   const isReplaying = ref(false) // Whether the replay is active
+  const isSettingUpMicrophone = ref(false) // Whether the microphone is being set up
 
   // Messages for loading states
   const loadingRecordingMessage = ref('Laula!')
@@ -48,7 +49,6 @@ export function useRecording({
     showReplay.value = false // Hide replay initially
     isRecordingCancelled.value = false // Reset cancel flag
     errorMessage.value = '' // Reset any error message
-    isInCountdown.value = true // Start the countdown
 
     // Get the start beat and relevant time signature and tempo info for the selected measure
     const measureStartBeat = measureInfo.value.find(
@@ -70,39 +70,39 @@ export function useRecording({
     const totalCountTime = beats * clickInterval // Total time for the countdown
 
     countdown.value = beats // Set countdown to number of beats
-    let elapsedTime = 0 // Elapsed time during countdown
-    let hasStartedRecording = false // Flag to start recording when countdown ends
 
     // Build the metronome with the current measures
     await buildMetronome(startMeasure.value, endMeasure.value, isMetronomeEnabled.value)
-    await startMetronome() // Start the metronome
-
-    // Countdown loop
-    while (countdown.value > 0) {
-      if (!isInCountdown.value) {
-        countdown.value = 0
-        return // Stop countdown if interrupted
-      }
-      await new Promise((resolve) => setTimeout(resolve, clickInterval * 1000)) // Wait for the next beat
-
-      elapsedTime += clickInterval // Update elapsed time
-      const timeRemaining = totalCountTime - elapsedTime // Calculate remaining time for countdown
-
-      if (!isInCountdown.value) {
-        countdown.value = 0
-        return // Stop countdown if interrupted
-      }
-
-      if (!hasStartedRecording && timeRemaining < 1.0) {
-        startRecordingAudio(currentSession, timeRemaining) // Start recording when countdown ends
-        hasStartedRecording = true
-      }
-
-      countdown.value-- // Decrement countdown
-    }
-
-    isInCountdown.value = false // End countdown
+    const timeRemaining = totalCountTime + 2
     isRecording.value = true // Set recording flag to true
+    startRecordingAudio(currentSession, timeRemaining) // Start recording when countdown ends
+
+    isSettingUpMicrophone.value = true
+    isInCountdown.value = true // Start the countdown
+    await new Promise(resolve => setTimeout(resolve, 2000))
+  
+    if (isInCountdown.value && currentSession === requestSession) {
+      isSettingUpMicrophone.value = false
+      await startMetronome() // Start the metronome
+
+      // Countdown loop
+      while (countdown.value > 0) {
+        if (!isInCountdown.value) {
+          countdown.value = 0
+          return // Stop countdown if interrupted
+        }
+        await new Promise((resolve) => setTimeout(resolve, clickInterval * 1000)) // Wait for the next beat
+
+        if (!isInCountdown.value) {
+          countdown.value = 0
+          return // Stop countdown if interrupted
+        }
+
+        countdown.value-- // Decrement countdown
+      }
+
+      isInCountdown.value = false // End countdown
+    }
   }
 
   // Function to start the actual audio recording
@@ -194,18 +194,18 @@ export function useRecording({
     stopMetronome() // Stop the metronome
 
     if (isRecording.value) {
+      isInCountdown.value = false // If not recording, stop the countdown
       try {
         await cancel() // Cancel the recording
       } catch (error) {
         console.error(error) // Log any errors
       }
-    } else {
-      isInCountdown.value = false // If not recording, stop the countdown
     }
 
     isRecordingCancelled.value = true // Set the cancel flag
     isRecording.value = false // Stop recording flag
     isProcessingAudio.value = false // Stop processing flag
+    isSettingUpMicrophone.value = false // Stop microphone setup
     setError('Salvestamine katkestatud!') // Set cancellation message
   }
 
@@ -215,6 +215,7 @@ export function useRecording({
     isRecording,
     isProcessingAudio,
     isRecordingCancelled,
+    isSettingUpMicrophone,
     countdown,
     showChart,
     showReplay,

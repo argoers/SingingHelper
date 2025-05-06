@@ -66,13 +66,18 @@ export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
 
       let numBeats = beatsUntilNextChange / (4 / beatType) // Number of beats to generate in the current segment
 
-      let j = isInCountdown ? 3 : 1 // Number of times to play the click sound (countdown behavior)
-      let k = 0
+      let numberOfLoops = isInCountdown ? 3 : 1 // Number of times to play the click sound (countdown behavior)
+      
       if (!isMetronomeEnabled) {
-        numBeats = beatsPerMeasure * (4 / beatType) // If metronome is disabled, play a full measure
-        j -= 1 // Adjust the number of click events
+        numberOfLoops = 1
+        numBeats = beatsPerMeasure * 2 // If metronome is disabled, play a full measure
+      } else if (isMetronomeEnabled && isInCountdown && nextTS === undefined && nextTempo === undefined) { 
+        numberOfLoops = 1
+        numBeats += beatsPerMeasure * 3
       }
-      while (k < j) {
+
+      let loopIndex = 0
+      while (loopIndex < numberOfLoops) {
         // Generate beat events
         for (let i = 0; i < numBeats; i++) {
           const isStrong = i % beatsPerMeasure === 0 // Strong beat on the first beat of the measure
@@ -81,9 +86,9 @@ export function useMetronome(timeSignatureInfo, tempoInfo, speed, measureInfo) {
             volume: isStrong ? 1 : 0.1, // Louder volume for strong beats
           })
           bufferDuration += secondsPerBeat // Increase the buffer duration by seconds per beat
-          if (k == 0) currentOffset += 4 / beatType // Adjust the current offset for the first countdown
+          if (loopIndex == 0) currentOffset += 4 / beatType // Adjust the current offset for the first countdown
         }
-        k++
+        loopIndex++
       }
       isInCountdown = false // Countdown is over
 
